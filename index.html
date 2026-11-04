@@ -305,6 +305,7 @@ body.studio .user-only { display: none !important; }
         </div>
         <div class="seg" role="group" aria-label="Bars">
           <button class="small" type="button" id="edAddBar" title="Add a bar at the end">+ Bar</button>
+          <button class="small" type="button" id="edEvenBars" title="Make every bar the usual length again (for example after a bar got longer); nothing moves in time">Even out bars</button>
           <button class="small" type="button" id="edDelBar" title="Remove the last bar">&minus; Bar</button>
         </div>
       </div>
@@ -317,7 +318,7 @@ body.studio .user-only { display: none !important; }
       <p class="note edinfo" id="edInfo"></p>
       <p class="note">Sing to edit: select the notes to redo (or put the playhead where to start), choose the part and press Record. After a count-in the other voices play while you sing; headphones help. Fix pitches keeps the rhythm; New notes writes what you sang on the grid.</p>
       <p class="note">Words: click a word above the notes to change it (Enter goes to the next one), drag it to move it, drag its right edge to make it longer or shorter, double-click empty space above a part's notes to add one. Shift-click or drag a box to select several; Ctrl+C copies them, click where they should go in another part and press Ctrl+V. With one word selected, ←/→ move it; Delete removes the selected words. Ctrl+Z / Ctrl+Y undo and redo notes and words alike. Save (Ctrl+S) keeps the song in songs.json.</p>
-      <p class="note">Drag a note to move it in time and pitch; drag its right end to change its length. Drag on empty space to select several notes, Shift-click to add one. Arrow keys move the selection (Shift+↑/↓ by an octave). Click empty space to move the playhead, or drag the playhead line or the bar numbers; Paste and Insert pause work there. A pause adds silence in all voices and moves the rest of the piece later.</p>
+      <p class="note">Drag a note to move it in time and pitch; drag its right end to change its length. Drag on empty space to select several notes, Shift-click to add one. Arrow keys move the selection (Shift+↑/↓ by an octave). Click empty space to move the playhead, or drag the playhead line or the bar numbers; Paste and Insert pause work there. A pause adds silence in all voices and moves the rest of the piece later; bars keep their length.</p>
       <div class="actions" hidden>
         <input id="projName" type="text" placeholder="Project name" aria-label="Project name" maxlength="80">
         <button class="primary" type="button" id="projSave">Save project</button>
@@ -1407,11 +1408,39 @@ function edBars(add) {
 // silence in every part at the playhead: later notes move later, a note sounding there is cut in two
 // (it stops for the pause and goes on after it); the bar it falls in becomes that much longer
 function edPlayheadPlain() { return edSnap(edPlain(locate(session ? currentBeat() : cursor).within)); }
+// Bars keep their length when time is inserted or removed: the music after the playhead moves across the
+// bar lines (notes crossing a bar line are tied) and bars are added or dropped at the end.
+function edUsualBar() {
+  const c = {};
+  ed.model.barLen.forEach(l => { const k = +l.toFixed(3); c[k] = (c[k] || 0) + 1; });
+  return +Object.keys(c).sort((a, b) => c[b] - c[a] || b - a)[0] || 4;
+}
+// derived words (spread from the per-bar lyrics) are fixed in time first, so they move with their notes
+function edFixWords() { ed.model.parts.forEach((p, v) => { if (!p.lyr) p.lyr = lyList(v).map(x => ({ t: x.t, d: x.d, text: x.text })); }); }
+function edContentEnd() {
+  let e = 0;
+  ed.model.parts.forEach(p => { p.notes.forEach(n => { e = Math.max(e, n.t + n.d); }); (p.lyr || []).forEach(x => { e = Math.max(e, x.t + x.d); }); });
+  return e;
+}
+// fermata and breath marks belong to the moment their bar ended; after a change they go to the bar now ending there
+function edMoveMarks(oldP, map) {
+  const m = ed.model.meta;
+  const mv = list => [...new Set(list.map(bn => { const t = map(oldP[bn]); return edBarAt(Math.max(0, t - 1e-3)) + 1; }))].sort((a, b) => a - b);
+  m.fermataBars = mv(m.fermataBars || []); m.breathAfter = mv(m.breathAfter || []);
+}
+function edTrimEnd(minTotal) {          // drop empty bars at the end, never below minTotal beats
+  const m = ed.model, end = edContentEnd();
+  while (m.barLen.length > 1) {
+    const sum = m.barLen.reduce((a, b) => a + b, 0), last = m.barLen[m.barLen.length - 1];
+    if (sum - last < Math.max(end, minTotal) - 1e-3) break;
+    m.barLen.pop();
+  }
+}
 function edInsertPause(len) {
   const at = edPlayheadPlain();
   edChange(() => {
-    const m = ed.model, b = at >= edTotal() - EPS ? m.barLen.length - 1 : edBarAt(at);
-    m.barLen[b] += len;
+    const m = ed.model, oldP = ed.P.slice(), L = edUsualBar();
+    edFixWords();
     m.parts.forEach(p => (p.lyr || []).forEach(x => { if (x.t >= at - EPS) x.t += len; else if (x.t + x.d > at + EPS) x.d += len; }));
     m.parts.forEach(p => {
       const add = [];
@@ -1421,27 +1450,51 @@ function edInsertPause(len) {
       });
       p.notes.push(...add);
     });
+    const need = Math.max(edContentEnd(), oldP[oldP.length - 1] + len);
+    while (m.barLen.reduce((a, b) => a + b, 0) < need - 1e-3) m.barLen.push(L);
     edPrefix();
+    edMoveMarks(oldP, t => (t > at + EPS ? t + len : t));
+    if (m.parts[0].lyr) m.meta.lyrics = lyPerBar(m.parts[0].lyr, ed.P);
   });
-  $('edInfo').textContent = 'Inserted a pause of ' + len + (len === 1 ? ' beat' : ' beats') + ' in bar ' + (edBarAt(at) + 1) + '.';
+  $('edInfo').textContent = 'Inserted a pause of ' + len + (len === 1 ? ' beat' : ' beats') + ' in bar ' + (edBarAt(at) + 1) + '; the music after it moved later and the bars kept their length.';
 }
 function edRemovePause(len) {
-  const at = edPlayheadPlain(), m = ed.model, b = edBarAt(at), end = at + len;
+  const at = edPlayheadPlain(), m = ed.model, end = at + len;
   const busy = m.parts.some(p => p.notes.some(n => n.t < end - EPS && n.t + n.d > at + EPS));
-  if (busy || end > ed.P[b + 1] + EPS || m.barLen[b] - len < 0.25 - EPS) {
+  if (busy || end > edTotal() + EPS) {
     $('edInfo').textContent = busy ? 'There are notes in the ' + len + (len === 1 ? ' beat' : ' beats') + ' after the playhead, so there is no pause to remove there. Put the playhead at the start of the silence.'
-      : 'The pause to remove must lie inside one bar.';
+      : 'There aren’t ' + len + ' beats left after the playhead.';
     return;
   }
   edChange(() => {
-    m.barLen[b] -= len;
+    const oldP = ed.P.slice(), oldTotal = edTotal();
+    edFixWords();
     m.parts.forEach(p => p.notes.forEach(n => { if (n.t >= end - EPS) n.t -= len; }));
     m.parts.forEach(p => (p.lyr || []).forEach(x => { if (x.t >= end - EPS) x.t -= len; else if (x.t + x.d > at + EPS) x.d = Math.max(0.125, x.d - Math.min(len, x.t + x.d - at)); }));
+    edTrimEnd(oldTotal - len);
     edPrefix();
+    edMoveMarks(oldP, t => (t >= end - EPS ? t - len : Math.min(t, at)));
+    if (m.parts[0].lyr) m.meta.lyrics = lyPerBar(m.parts[0].lyr, ed.P);
   });
-  $('edInfo').textContent = 'Removed ' + len + (len === 1 ? ' beat' : ' beats') + ' of silence from bar ' + (b + 1) + '.';
+  $('edInfo').textContent = 'Removed ' + len + (len === 1 ? ' beat' : ' beats') + ' of silence; the music after it moved earlier.';
 }
-
+// re-divide the whole song into bars of the usual length; nothing moves in time
+function edEvenBars() {
+  const L = edUsualBar(), total = edTotal();
+  if (ed.model.barLen.every((l, i) => Math.abs(l - L) < 1e-3 || i === ed.model.barLen.length - 1)) { $('edInfo').textContent = 'All bars already have the usual length (' + L + ' beats).'; return; }
+  edChange(() => {
+    const m = ed.model, oldP = ed.P.slice();
+    edFixWords();
+    const n = Math.max(1, Math.ceil(total / L - 1e-6));
+    m.barLen = Array(n).fill(L);
+    const last = total - (n - 1) * L;
+    if (last > 1e-3) m.barLen[n - 1] = last;
+    edPrefix();
+    edMoveMarks(oldP, t => t);
+    if (m.parts[0].lyr) m.meta.lyrics = lyPerBar(m.parts[0].lyr, ed.P);
+  });
+  $('edInfo').textContent = 'Re-divided the song into bars of ' + L + ' beats (' + ed.model.barLen.length + ' bars). Nothing moved in time; Ctrl+Z undoes it.';
+}
 
 // Sing to edit: record one part by singing it while the other voices play, then turn the singing into
 // notes. "Fix pitches" keeps the rhythm and gives each note the pitch sung over it; "New notes" replaces
@@ -1684,6 +1737,7 @@ $('edCopy').addEventListener('click', edCopy);
 $('edCut').addEventListener('click', () => { if (edCopy()) edDelete(); });
 $('edPaste').addEventListener('click', edPaste);
 $('edAddBar').addEventListener('click', () => edBars(true));
+$('edEvenBars').addEventListener('click', edEvenBars);
 $('edPause').addEventListener('click', () => edInsertPause(+$('edPauseLen').value));
 $('recBtn').addEventListener('click', () => { if (rec.on || rec.counting) recStop(); else recStart(); });
 $('edUnpause').addEventListener('click', () => edRemovePause(+$('edPauseLen').value));
@@ -3132,7 +3186,7 @@ $('keyForget').addEventListener('click', () => {
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); EXAMPLE is used when it can't load.
 var STUDIO = /[?&]studio\b/.test(location.search);
-const BUILD = '4 Nov 2026, 21:05';   // shown in the header, to see which version a browser has
+const BUILD = '4 Nov 2026, 21:15';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
 $('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
 if (STUDIO) document.title = 'Polyphony Studio';
