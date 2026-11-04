@@ -130,6 +130,7 @@ textarea { width: 100%; min-height: 260px; resize: vertical; font-family: var(--
 .editbody { display: flex; flex-direction: column; gap: 10px; }
 .edtools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .edinfo { font-family: var(--font-mono); font-size: 12px; min-height: 1.4em; }
+#recBtn.rec { background: var(--bad); border-color: var(--bad); color: #fff; }
 #projName { font: inherit; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; flex: 1 1 200px; min-width: 0; }
 #projList { max-width: min(320px, 60vw); }
 .singhead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
@@ -308,7 +309,14 @@ textarea { width: 100%; min-height: 260px; resize: vertical; font-family: var(--
           <button class="small" type="button" id="edDelBar" title="Remove the last bar">&minus; Bar</button>
         </div>
       </div>
+      <div class="edtools" role="group" aria-label="Sing to edit">
+        <div class="ctl"><label for="recPart">Sing</label><select id="recPart"></select></div>
+        <select id="recMode" aria-label="What singing changes"><option value="pitch" selected>Fix pitches (keep rhythm)</option><option value="notes">New notes (pitch and rhythm)</option></select>
+        <label class="chk" title="If you sing in another octave than the part (for example a tenor part sung by a bass), move it to the part's octave"><input type="checkbox" id="recOct" checked> Match the part's octave</label>
+        <button class="small" type="button" id="recBtn" title="Count in, then sing the selected notes, or from the playhead's bar until you press Stop">&#9679; Record</button>
+      </div>
       <p class="note edinfo" id="edInfo"></p>
+      <p class="note">Sing to edit: select the notes to redo (or put the playhead where to start), choose the part and press Record. After a count-in the other voices play while you sing; headphones help. Fix pitches keeps the rhythm; New notes writes what you sang on the grid.</p>
       <p class="note">Drag a note to move it in time and pitch; drag its right end to change its length. Drag on empty space to select several notes, Shift-click to add one. Arrow keys move the selection (Shift+↑/↓ by an octave). Click empty space to move the playhead, or drag the playhead line or the bar numbers; Paste and Insert pause work there. A pause adds silence in all voices and moves the rest of the piece later.</p>
       <div class="actions">
         <input id="projName" type="text" placeholder="Project name" aria-label="Project name" maxlength="80">
@@ -1282,6 +1290,138 @@ function edRemovePause(len) {
   $('edInfo').textContent = 'Removed ' + len + (len === 1 ? ' beat' : ' beats') + ' of silence from bar ' + (b + 1) + '.';
 }
 
+
+// Sing to edit: record one part by singing it while the other voices play, then turn the singing into
+// notes. "Fix pitches" keeps the rhythm and gives each note the pitch sung over it; "New notes" replaces
+// the range with what was sung, one grid step at a time (same pitch in a row becomes one note).
+// The range is the selected notes of that part, or from the start of the playhead's bar until Stop.
+const rec = { on: false, counting: 0, v: 0, mode: 'pitch', a: 0, b: 0, samples: [], prevOn: null, raf: 0, names: '' };
+function recParts() {
+  const sel = $('recPart'), names = ed.model.parts.map(p => p.name).join('|');
+  if (names !== rec.names) {
+    const keep = sel.value;
+    sel.textContent = '';
+    ed.model.parts.forEach((p, i) => { const o = document.createElement('option'); o.value = i; o.textContent = p.name; sel.appendChild(o); });
+    sel.value = keep !== '' && +keep < ed.model.parts.length ? keep : '0';
+    rec.names = names;
+  }
+  const vs = [...new Set(edSelected().map(x => x.v))];
+  if (vs.length === 1 && !rec.on) sel.value = String(vs[0]);
+  $('recBtn').textContent = rec.on || rec.counting ? '■ Stop' : '● Record';
+  $('recBtn').classList.toggle('rec', rec.on || !!rec.counting);
+}
+function recClick(t, strong) {
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = 'square'; o.frequency.value = strong ? 1568 : 1046;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+  o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.1);
+}
+async function recStart() {
+  if (rec.on || rec.counting) return;
+  const v = +$('recPart').value, p = ed.model.parts[v];
+  if (!p) return;
+  const info = $('edInfo');
+  info.textContent = 'Starting the microphone…';
+  if (!(await ensureMic())) { info.textContent = $('singMsg').textContent || 'The microphone isn’t available.'; return; }
+  if (session) pausePlay();
+  const mine = p.notes.filter(n => ed.sel.has(n.id));
+  let a, b;
+  if (mine.length) { a = Math.min(...mine.map(n => n.t)); b = Math.max(...mine.map(n => n.t + n.d)); }
+  else { const pb = edBarAt(edPlain(locate(cursor).within)); a = ed.P[pb]; b = edTotal(); }
+  Object.assign(rec, { v, mode: $('recMode').value, a, b, samples: [], prevOn: state.on.slice() });
+  state.on = state.on.map((on, i) => i === v ? false : on);           // you sing this part yourself
+  syncButtons();
+  // count in one bar (at least 2 beats), then play from the start of the range
+  const bd = 60 / +$('tempo').value, n = Math.max(2, Math.round(ed.model.barLen[edBarAt(a)] || 4));
+  const T0 = ctx.currentTime + 0.1;
+  for (let i = 0; i < n; i++) recClick(T0 + i * bd, i === 0);
+  info.textContent = 'Get ready to sing ' + p.name + (mine.length ? ' (the selected notes)' : ' from bar ' + (edBarAt(a) + 1)) + '…';
+  rec.counting = setTimeout(() => {
+    rec.counting = 0; rec.on = true;
+    startPlay(edTL(a));
+    info.textContent = 'Recording ' + p.name + '. Sing now' + (mine.length ? '.' : ', and press Stop (or Space) when you’re done.');
+    recParts();
+    rec.raf = requestAnimationFrame(recLoop);
+  }, Math.max(0, (T0 + n * bd - 0.15 - ctx.currentTime) * 1000));
+  recParts();
+}
+function recLoop() {
+  rec.raf = 0;
+  if (!rec.on) return;
+  if (!session) { recFinish(); return; }
+  pumpPitch();
+  const age = sing.sungAt ? Math.max(0, Math.min(0.3, ctx.currentTime - sing.sungAt)) : 0.03;
+  const lat = (ctx.outputLatency || 0) + (ctx.baseLatency || 0) + sing.inLat + age;
+  const pos = (ctx.currentTime - session.t0) / session.bd - lat / session.bd;
+  if (pos >= 0) {
+    const t = edPlain(locate(pos).within);
+    if (t >= rec.a - EPS && t < rec.b) rec.samples.push({ t, m: sing.sungNow });
+    if (t >= rec.b - 0.02) { recFinish(); return; }
+  }
+  rec.raf = requestAnimationFrame(recLoop);
+}
+function recStop() {
+  if (rec.counting) { clearTimeout(rec.counting); rec.counting = 0; recRestore(); $('edInfo').textContent = 'Recording cancelled.'; recParts(); return; }
+  if (rec.on) recFinish();
+}
+function recRestore() { if (rec.prevOn && rec.prevOn.length === state.on.length) { state.on = rec.prevOn; syncButtons(); syncGains(); } rec.prevOn = null; }
+function recFinish() {
+  if (!rec.on) return;
+  rec.on = false;
+  if (rec.raf) cancelAnimationFrame(rec.raf), rec.raf = 0;
+  if (session) pausePlay();
+  recRestore();
+  const p = ed.model.parts[rec.v], sm = rec.samples, info = $('edInfo');
+  const end = sm.length ? Math.max(...sm.map(x => x.t)) : rec.a, b = Math.min(rec.b, end + 0.05);
+  const voiced = sm.filter(x => x.m != null);
+  rec.samples = [];
+  if (voiced.length < 5) { info.textContent = 'No singing was heard, so nothing changed. Check the microphone and try again.'; recParts(); draw(); return; }
+  const med = a => { const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
+  // sung an octave off (a different voice type)? move it to the part's octave
+  let k = 0;
+  const orig = p.notes.filter(n => n.t < b && n.t + n.d > rec.a).map(n => n.midi + p.shift);
+  if ($('recOct').checked) { const ref = orig.length ? med(orig) : med(p.notes.map(n => n.midi + p.shift).concat([60])); k = 12 * Math.round((ref - med(voiced.map(x => x.m))) / 12); }
+  const range = 'bars ' + (edBarAt(rec.a) + 1) + '–' + (edBarAt(b, true) + 1);
+  if (rec.mode === 'pitch') {
+    let changed = 0, heard = 0;
+    edChange(() => {
+      p.notes.forEach(n => {
+        if (n.t < rec.a - EPS || n.t >= b - EPS) return;
+        const skip = Math.min(0.25, n.d * 0.3), fs = sm.filter(x => x.t >= n.t + skip && x.t < n.t + n.d), vs = fs.filter(x => x.m != null);
+        if (!fs.length || vs.length < 0.4 * fs.length) return;
+        heard++;
+        const w = Math.round(med(vs.map(x => x.m)) + k) - p.shift;
+        if (w !== n.midi) { n.midi = w; changed++; }
+      });
+      ed.sel = new Set(p.notes.filter(n => n.t >= rec.a - EPS && n.t < b - EPS).map(n => n.id));
+    });
+    info.textContent = changed ? 'Changed ' + changed + ' of ' + heard + ' notes you sang in ' + p.name + ', ' + range + '. Undo goes back.'
+      : 'All ' + heard + ' notes you sang in ' + p.name + ' already had those pitches.';
+  } else {
+    const g = ed.grid || 0.25, steps = [];
+    for (let t = rec.a; t < b - 1e-3; t += g) {
+      const fs = sm.filter(x => x.t >= t && x.t < t + g), vs = fs.filter(x => x.m != null);
+      steps.push({ t, d: Math.min(g, b - t), m: fs.length && vs.length >= 0.5 * fs.length ? Math.round(med(vs.map(x => x.m)) + k) : null });
+    }
+    for (let i = 1; i < steps.length - 1; i++) if (steps[i - 1].m != null && steps[i - 1].m === steps[i + 1].m && steps[i].m !== steps[i - 1].m && g <= 0.25) steps[i].m = steps[i - 1].m;   // a one-step wobble
+    const notes = [];
+    steps.forEach(st => {
+      const last = notes[notes.length - 1];
+      if (st.m == null) return;
+      if (last && last.midi === st.m - p.shift && Math.abs(last.t + last.d - st.t) < 1e-3) last.d += st.d;
+      else notes.push({ id: ed.nextId++, midi: st.m - p.shift, t: st.t, d: st.d });
+    });
+    edChange(() => {
+      const span = { id: -1, t: rec.a, d: b - rec.a };
+      p.notes.push(span); edCarve(p, [span]); p.notes = p.notes.filter(n => n.id !== -1);
+      p.notes.push(...notes);
+      ed.sel = new Set(notes.map(n => n.id));
+    });
+    info.textContent = 'Wrote ' + notes.length + ' notes from your singing into ' + p.name + ', ' + range + '. Undo goes back.';
+  }
+  recParts();
+}
+
 // drawn by draw() in edit mode instead of the playback notes: semitone guides, the grid, notes, selection
 function drawEdit(g, G, X, top, laneH, gap, within) {
   const sl = wrap.scrollLeft, vw = wrap.clientWidth || G.W, line = cssVar('--line'), muted = cssVar('--muted'), ink = cssVar('--ink');
@@ -1328,6 +1468,16 @@ function drawEdit(g, G, X, top, laneH, gap, within) {
   };
   m.parts.forEach((p, v) => p.notes.forEach(n => drawNote(v, p, n, false)));
   if (d && d.kind === 'new') drawNote(d.v, m.parts[d.v], d.n, true);
+  if (rec.on && rec.samples.length) {        // what you are singing, over the part being recorded
+    g.globalAlpha = 1; g.strokeStyle = cssVar('--accent'); g.lineWidth = 2.5; g.lineCap = 'round';
+    let prev = null;
+    rec.samples.forEach(x => {
+      if (x.m == null) { prev = null; return; }
+      const px = X(edTL(x.t)), py = laneYOf(rec.v, x.m);
+      if (prev && Math.abs(prev.m - x.m) < 3) { g.beginPath(); g.moveTo(prev.x, prev.y); g.lineTo(px, py); g.stroke(); }
+      prev = { x: px, y: py, m: x.m };
+    });
+  }
   if (d && d.kind === 'box' && d.moved) {
     g.globalAlpha = 0.12; g.fillStyle = cssVar('--accent');
     g.fillRect(Math.min(d.x0, d.x1), Math.min(d.y0, d.y1), Math.abs(d.x1 - d.x0), Math.abs(d.y1 - d.y0));
@@ -1345,6 +1495,7 @@ function edShowState() {
   const sel = edSelected();
   $('edInfo').textContent = sel.length === 1 ? 'Selected: ' + noteName(sel[0].n.midi + sel[0].p.shift) + ', ' + (+sel[0].n.d.toFixed(3)) + ' beats, ' + sel[0].p.name
     : sel.length ? sel.length + ' notes selected' : 'Click a note to select it, drag to select several.';
+  recParts();
   projShowState();
 }
 function edSetTool(t) {
@@ -1354,6 +1505,7 @@ function edSetTool(t) {
 function setEditing(on) {
   if (on && (!piece || piece.audio)) return;
   if (on && sing.on) setSinging(false);
+  if (!on) { if (rec.counting) recStop(); else if (rec.on) { rec.on = false; rec.samples = []; recRestore(); } }
   ed.on = on;
   $('editOn').setAttribute('aria-pressed', String(on));
   $('editBody').hidden = !on;
@@ -1379,6 +1531,7 @@ $('edCut').addEventListener('click', () => { if (edCopy()) edDelete(); });
 $('edPaste').addEventListener('click', edPaste);
 $('edAddBar').addEventListener('click', () => edBars(true));
 $('edPause').addEventListener('click', () => edInsertPause(+$('edPauseLen').value));
+$('recBtn').addEventListener('click', () => { if (rec.on || rec.counting) recStop(); else recStart(); });
 $('edUnpause').addEventListener('click', () => edRemovePause(+$('edPauseLen').value));
 $('edDelBar').addEventListener('click', () => edBars(false));
 document.addEventListener('keydown', e => {
