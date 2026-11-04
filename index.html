@@ -127,6 +127,14 @@ textarea { width: 100%; min-height: 260px; resize: vertical; font-family: var(--
 
 .sing { display: flex; flex-direction: column; gap: 14px; }
 .editp { display: flex; flex-direction: column; gap: 12px; }
+body:not(.studio) .studio-only { display: none !important; }
+.library { display: flex; flex-direction: column; gap: 10px; }
+.songlist { display: flex; flex-wrap: wrap; gap: 8px; }
+.song { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; min-width: 0; max-width: 100%; }
+.song b { font-weight: 600; }
+.song span { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.song:hover { border-color: var(--accent); }
+.song[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .editbody { display: flex; flex-direction: column; gap: 10px; }
 .edtools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .edinfo { font-family: var(--font-mono); font-size: 12px; min-height: 1.4em; }
@@ -174,12 +182,18 @@ textarea { width: 100%; min-height: 260px; resize: vertical; font-family: var(--
 <body>
 <main>
   <header>
-    <div class="meta">Polyphony player</div>
-    <h1 id="title">Aghdgomasa Shensa</h1>
+    <div class="meta" id="appName">Polyphony player</div>
+    <h1 id="title">Ceduri Mravaljamier</h1>
     <div class="meta" id="subtitle"></div>
   </header>
 
-  <section class="panel upload" aria-label="Upload a score">
+  <section class="panel library" aria-label="Songs">
+    <h2>Songs</h2>
+    <div class="songlist" id="songList"></div>
+    <p class="msg" id="libMsg"></p>
+  </section>
+
+  <section class="panel upload studio-only" aria-label="Upload a score">
     <h2>Play your own score</h2>
     <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose score pictures or MusicXML">
       <button class="small" id="pick" type="button">Choose file</button>
@@ -263,7 +277,7 @@ textarea { width: 100%; min-height: 260px; resize: vertical; font-family: var(--
 
   <section class="panel voices" id="voices" aria-label="Voices"></section>
 
-  <section class="panel editp" aria-label="Editing mode and projects">
+  <section class="panel editp studio-only" aria-label="Editing mode and projects">
     <div class="singhead">
       <button class="small toggle" id="editOn" type="button" aria-pressed="false" style="--c: var(--accent)">Editing mode</button>
       <div class="ctl"><label for="projList">Project</label><select id="projList"></select></div>
@@ -324,6 +338,8 @@ textarea { width: 100%; min-height: 260px; resize: vertical; font-family: var(--
         <button class="small" type="button" id="projSaveNew">Save as new</button>
         <button class="small" type="button" id="projExport">Export file</button>
         <button class="small" type="button" id="projImport">Import file</button>
+        <button class="small" type="button" id="libAdd" title="Put this song into songs.json, the list the user version shows">Add to song library</button>
+        <input id="libFile" type="file" accept=".json,application/json" hidden>
         <input id="projFile" type="file" accept=".json,application/json" hidden>
       </div>
     </div>
@@ -342,7 +358,7 @@ textarea { width: 100%; min-height: 260px; resize: vertical; font-family: var(--
     <div class="lyrics" id="lyrics"></div>
   </section>
 
-  <details class="panel" id="editor">
+  <details class="panel studio-only" id="editor">
     <summary>Transcription (check and correct)</summary>
     <div class="inner">
       <p class="note">Each bar is a line of NOTE:BEATS tokens. Pitches are written as on the staff (F#4, Bb3, E5), r is a rest, beats count quarter notes (0.5 is an eighth). A ~ after the length ties the note into the next bar. Change a note, press Apply, and play again, or use Editing mode above the score.</p>
@@ -361,67 +377,148 @@ textarea { width: 100%; min-height: 260px; resize: vertical; font-family: var(--
 <script>
 /*DATA*/
 const EXAMPLE = {
-  title: 'Aghdgomasa Shensa',
-  subtitle: 'Easter hymn · Georgian Orthodox liturgy · Erkomaishvili / Garaqanidze · A major',
-  tempo: 72,
-  repeatTimes: 1,
-  voices: [
-    { name: 'Tenor I', octaveShift: -12, bars: [
-      'E5:.5 E5:.5 E5:1.5 C#5:.5 D5:1',
-      'E5:.5 D5:.5 D5:.5 C#5:.5 B4:1',
-      'C#5:1 D5:1 E5:.5 C#5:.25 A4:.25 B4:1',
-      'C#5:2',
-      'r:.5 E5:.5 E5:.5 E5:.5 E5:1 F#5:1',
-      'E5:1 F#5:.5 E5:.5 D5:.25 E5:.25 D5:.25 C#5:.25 B4:1',
-      'C#5:.5 D5:.5 E5:.5 D5:.5 C#5:.5 B4:.5',
-      'C#5:2',
-      'E5:.5 E5:.5 E5:1.5 C#5:.5 D5:1',
-      'E5:.5 D5:.5 D5:.25 E5:.25 D5:.25 C#5:.25 B4:1',
-      'C#5:1 D5:1 E5:.5 C#5:.25 A4:.25 B4:1 C#5:2',
-      'D5:.5 E5:.5 F#5:2 Gn5:.5 F#5:.5',
-      'E5:1 C#5:.5 D5:.5 E5:2',
-      'E5:1 C#5:.25 B4:.25 A4:.25 F#4:.25 G#4:.5 A4:.5 A4:.25 C#5:.25 B4:.5',
-      'C#5:2'
-    ] },
-    { name: 'Tenor II', octaveShift: -12, bars: [
-      'C#5:.5 C#5:.5 C#5:1.5 A4:.5 B4:1',
-      'C#5:.5 B4:.5 B4:.5 A4:.5 G#4:1',
-      'A4:1 B4:1 A4:1 G#4:1',
-      'F#4:2',
-      'r:.5 C#5:.5 C#5:.5 C#5:.5 C#5:1 D5:1',
-      'C#5:1 D5:.5 C#5:.5 B4:.5 A4:.5 G#4:1',
-      'A4:.5 B4:.5 A4:1 A4:.5 G#4:.5',
-      'F#4:2',
-      'C#5:.5 C#5:.5 C#5:.75 B4:.25 A4:1 B4:1',
-      'C#5:.5 B4:.5 B4:.25 C#5:.25 B4:.25 A4:.25 G#4:1',
-      'B4:1 B4:1 A4:1 A4:.5 G#4:.5 F#4:2',
-      'B4:.5 C#5:.5 D5:2 D5:1',
-      'D5:.5 C#5:.25 B4:.25 A4:.5 B4:.5 A4:2',
-      'A4:1 A4:1 G#4:.5 F#4:.5 F#4:.25 A4:.25 G#4:.5',
-      'F#4:2'
-    ] },
-    { name: 'Bass', octaveShift: 0, bars: [
-      'E3:.5 E3:.5 E3:2 E3:1',
-      'E3:.5 E3:.5 E3:2',
-      'F#3:1 Gn3:.5 E3:.25 Cn3:.25 D3:1 D3:.5 E3:.5',
-      'F#3:2',
-      'r:.5 E3:.5 E3:.5 E3:.5 E3:2',
-      'E3:1 E3:1 E3:2',
-      'F#3:.5 E3:.5 D3:1 D3:.5 E3:.5',
-      'F#3:2',
-      'E3:.5 E3:.5 E3:2 E3:1',
-      'E3:.5 E3:.5 E3:2',
-      'B2:1 C#3:1 D3:1 D3:.5 E3:.5 F#3:2',
-      'D3:.5 D3:.5 D3:2 D3:1',
-      'E3:1 F#3:.5 E3:.5 D3:2',
-      'D3:1 A2:.5 B2:.5 C#3:.5 D3:.5 D3:.5 E3:.5',
-      'F#3:2'
-    ] }
-  ],
-  breathAfter: [2, 4, 8, 11, 13],
-  lyrics: ['agh-dgo-ma-sa', 'she-n(uh)-sa', 'kri-ste ma-tskho-', 'var', 'an-ge-lo-zni', 'u-ga-lo',
-    'be-n(uh) tsa-ta shi-', 'na', 'da chven tsa-ghirs', 'mqve-n(uh) kve-', 'qa-na-sa-ze-da',
-    'Tsmi-n(uh)-di-t(uh)', 'gu-li-ta', 'di-de-ba-d(uh) she-n(uh)', 'da']
+ "title": "Ceduri Mravaljamier",
+ "subtitle": "Many Years (Georgian) · ცედური მრავალჟამიერ · Traditional",
+ "tempo": 72,
+ "repeatTimes": 1,
+ "transpose": -2,
+ "breathAfter": [],
+ "fermataBars": [
+  9
+ ],
+ "lyrics": [
+  "Mra-",
+  "val-",
+  "ja-mi-er,",
+  "Mra-",
+  "val-",
+  "ja-mi-er,",
+  "Mra-",
+  "val-ja-mi-",
+  "er,",
+  "Mra-",
+  "val,",
+  "Mra-val-",
+  "ja-mi,",
+  "ja-mi-er",
+  "ja-mi-",
+  "er,",
+  "Mra-",
+  "val,",
+  "Mra-val-",
+  "ja-mi,",
+  "ja-mi-er!"
+ ],
+ "voices": [
+  {
+   "name": "Tenor 1",
+   "octaveShift": -12,
+   "bars": [
+    "r:4 E5:2 C5:1 D5:1",
+    "E5:4",
+    "E5:1 F5:1 F5:1 E5:1~",
+    "E5:1 D5:2 B4:1 C5:1",
+    "D5:4",
+    "D5:1 E5:1 E5:1 D5:1 E5:1~",
+    "E5:1 E5:4",
+    "F5:3 F5:0.75 F5:0.25",
+    "F5:1.5 G5:0.25 F5:0.25 E5:2",
+    "E5:2 F5:1 E5:1",
+    "D5:4",
+    "D5:2 E5:2",
+    "F5:3 F5:1",
+    "E5:0.75 E5:0.25 E5:2 E5:2",
+    "F5:3 F5:0.75 F5:0.25",
+    "F5:1.5 G5:0.25 F5:0.25 E5:2",
+    "E5:2 F5:1 E5:1",
+    "D5:4",
+    "D5:2 E5:2",
+    "F5:3 F5:1",
+    "E5:0.75 E5:0.25 E5:5.5 r:3.5"
+   ]
+  },
+  {
+   "name": "Tenor 2",
+   "octaveShift": -12,
+   "bars": [
+    "G4:4 G4:2 E4:1 F4:1",
+    "G4:4",
+    "G4:1 A4:1 A4:1 G4:1~",
+    "G4:1 F4:2 D4:1 E4:1",
+    "F4:4",
+    "F4:1 G4:1 G4:1 F4:1 G4:1~",
+    "G4:1 G4:2 C5:1 B4:1",
+    "A4:3 B4:0.75 C5:0.25",
+    "D5:1.5 E5:0.25 D5:0.25 C5:2",
+    "C5:2 D5:1 C5:1",
+    "B4:4",
+    "B4:2 C5:2",
+    "D5:2 A4:1 B4:1",
+    "C5:0.75 C5:0.25 C5:2 G4:0.667 C5:0.667 B4:0.666",
+    "A4:3 B4:0.75 C5:0.25",
+    "D5:1.5 E5:0.25 D5:0.25 C5:2",
+    "C5:2 D5:1 C5:1",
+    "B4:4",
+    "B4:2 C5:2",
+    "D5:2 A4:1 B4:1",
+    "C5:0.75 C5:0.25 C5:1.5 A4:1.5 G4:2.5 r:3.5"
+   ]
+  },
+  {
+   "name": "Bass 1",
+   "octaveShift": 0,
+   "bars": [
+    "r:4 C3:4",
+    "C3:4",
+    "C3:2 C3:1 C3:1~",
+    "C3:1 G3:4",
+    "G3:4",
+    "G3:2 G3:1 G3:1 G3:1~",
+    "G3:1 C3:4",
+    "F3:3 F3:0.75 F3:0.25",
+    "G3:4",
+    "G3:4",
+    "G3:4",
+    "G3:2 G3:2",
+    "G3:3 G3:1",
+    "C3:0.75 C3:0.25 C3:2 C3:2",
+    "F3:3 F3:0.75 F3:0.25",
+    "G3:4",
+    "G3:4",
+    "G3:4",
+    "G3:2 G3:2",
+    "G3:3 G3:1",
+    "C3:0.75 C3:0.25 C3:5.5 r:3.5"
+   ]
+  },
+  {
+   "name": "Bass 2",
+   "octaveShift": 0,
+   "bars": [
+    "r:4 C3:4",
+    "C3:4",
+    "C3:2 C3:1 C3:1~",
+    "C3:1 G2:4",
+    "G2:4",
+    "G2:2 G2:1 G2:1 G2:1~",
+    "G2:1 C3:4",
+    "F3:3 F3:0.75 F3:0.25",
+    "G3:4",
+    "G3:4",
+    "G3:4",
+    "G3:2 G3:2",
+    "G3:3 G3:1",
+    "C3:0.75 C3:0.25 C3:2 C3:2",
+    "F3:3 F3:0.75 F3:0.25",
+    "G3:4",
+    "G3:4",
+    "G3:4",
+    "G3:2 G3:2",
+    "G3:3 G3:1",
+    "C3:0.75 C3:0.25 C3:5.5 r:3.5"
+   ]
+  }
+ ]
 };
 /*END*/
 
@@ -645,6 +742,7 @@ function loadRaw(raw, from) {
   const isAudio = !!(raw && raw.kind === 'audio');
   const r = buildPiece(raw);
   curRaw = isAudio ? null : raw;
+  if (typeof showLibrary === 'function' && $('songList').childElementCount) showLibrary();
   if (ed.on) { if (isAudio) setEditing(false); else { edFromPiece(); ed.undo = []; ed.redo = []; edRanges(); edShowState(); draw(); } }
   $('editor').hidden = isAudio;
   $('json').value = isAudio ? '' : JSON.stringify(raw, null, 1);
@@ -2577,8 +2675,81 @@ $('keyForget').addEventListener('click', () => {
   showKeyState();
 })();
 
+/* ---------- user version and studio ---------- */
+// index.html is the user version: pick a song from the library, listen and sing. studio.html (or
+// index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
+// The library is songs.json next to this page ({ songs: [score, …] }); EXAMPLE is used when it can't load.
+const STUDIO = /[?&]studio\b/.test(location.search);
+document.body.classList.toggle('studio', STUDIO);
+if (STUDIO) { document.title = 'Polyphony Studio'; $('appName').textContent = 'Polyphony studio'; }
+let library = [EXAMPLE];
+function songKey(r) { return String(r && r.title || '').trim().toLowerCase(); }
+function showLibrary() {
+  const box = $('songList'), cur = songKey(curRaw);
+  box.textContent = '';
+  library.forEach((sg, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'song'; b.dataset.i = i;
+    b.setAttribute('aria-pressed', String(songKey(sg) === cur));
+    const t = document.createElement('b'); t.textContent = sg.title || 'Untitled';
+    const st = document.createElement('span'); st.textContent = sg.subtitle || '';
+    b.append(t); if (sg.subtitle) b.append(st);
+    box.appendChild(b);
+  });
+}
+function chooseSong(i) {
+  const sg = library[i];
+  if (!sg) return;
+  if (STUDIO && ed.dirty && !confirm('Open “' + sg.title + '”? Unsaved changes to the current score will be lost.')) return;
+  try { $('libMsg').className = 'msg'; $('libMsg').textContent = ''; loadRaw(sg, 'Loaded'); }
+  catch (e) { $('libMsg').className = 'msg bad'; $('libMsg').textContent = 'This song could not be loaded: ' + (e && e.message || 'unknown error'); return; }
+  if (STUDIO) { ed.project = null; ed.dirty = false; $('projName').value = ''; projMsg(''); }
+  lsSet('pp.song', songKey(sg));
+  showLibrary();
+}
+$('songList').addEventListener('click', e => { const b = e.target.closest('.song'); if (b) chooseSong(+b.dataset.i); });
+async function loadLibrary() {
+  try {
+    const r = await fetch('songs.json', { cache: 'no-store' });
+    const j = r.ok ? await r.json() : null;
+    if (j && Array.isArray(j.songs) && j.songs.length) library = j.songs.filter(x => x && Array.isArray(x.voices));
+  } catch (e) { /* opened as a file, or offline: only the built-in song */ }
+  const want = lsGet('pp.song'), i = library.findIndex(x => songKey(x) === want);
+  if (!STUDIO && i > 0) chooseSong(i);
+  else if (!STUDIO && library.length && songKey(library[0]) !== songKey(curRaw)) chooseSong(0);
+  showLibrary();
+}
+// studio: put the current song into songs.json (replacing a song with the same title) and download it;
+// put the file next to index.html, then commit and push to publish it
+async function libAdd() {
+  const raw = projCurrentRaw();
+  if (!raw) return;
+  let lib = null;
+  try { const r = await fetch('songs.json', { cache: 'no-store' }); if (r.ok) lib = await r.json(); } catch (e) { /* opened as a file */ }
+  if (!lib) {
+    projMsg('Choose the current songs.json from the app folder, so the other songs are kept.');
+    lib = await new Promise(res => {
+      const inp = $('libFile');
+      inp.onchange = async () => { const f = inp.files[0]; inp.value = ''; if (!f) return res(null); try { res(JSON.parse(await f.text())); } catch (e) { res(null); } };
+      inp.click();
+    });
+    if (!lib) { projMsg('No library file was read, so nothing was added.', true); return; }
+  }
+  const songs = Array.isArray(lib.songs) ? lib.songs : [];
+  const i = songs.findIndex(x => songKey(x) === songKey(raw));
+  if (i >= 0) songs[i] = raw; else songs.push(raw);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({ songs }, null, 1) + '\n'], { type: 'application/json' }));
+  a.download = 'songs.json'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  library = songs; showLibrary();
+  projMsg((i >= 0 ? 'Updated “' : 'Added “') + raw.title + '” (' + songs.length + ' songs). Replace songs.json in the app folder with the downloaded file, then commit and push.');
+}
+$('libAdd').addEventListener('click', libAdd);
+
 loadRaw(EXAMPLE, 'Example');
 $('readMsg').textContent = '';
+showLibrary();
+loadLibrary();
 </script>
 
 </body>

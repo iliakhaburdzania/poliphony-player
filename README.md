@@ -2,6 +2,19 @@
 
 Play multi-voice choral scores voice by voice, and practise singing your part with live pitch feedback and a score.
 
+There are two versions of the same app:
+
+- **index.html: the user version** (this is the page GitHub Pages shows). Pick a song from the list, listen voice by voice, and sing your part in singing mode.
+- **studio.html: the studio** (it opens `index.html?studio`). Everything: reading scores, the transcription, editing mode, projects, and adding songs to the library.
+
+The song list comes from **songs.json**. The first song in it is the default.
+
+## Publishing a song
+
+1. Open the studio, load or edit the song, then press **Add to song library** in the editing panel.
+2. A new `songs.json` downloads with the song added (a song with the same title is replaced). If the studio was opened as a file, it first asks you to choose the current `songs.json` from this folder.
+3. Replace `songs.json` in this folder with the downloaded one, then commit and push. The user version shows it a minute later.
+
 ## Run it
 
 1. Open `index.html` in Chrome or Edge.

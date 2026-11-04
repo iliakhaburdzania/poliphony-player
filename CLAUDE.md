@@ -6,6 +6,8 @@ listens to the microphone and scores how well you sing your part.
 
 ## Files
 
+- `songs.json` — the song library the user version lists ({ songs: [score, …] }, first = default)
+- `studio.html` — redirects to `index.html?studio`
 - `index.html` — the whole app: HTML, CSS and JavaScript in one file, no build step. Open it in Chrome or Edge.
 - `scores/` — example transcriptions in the app's JSON format (paste one into the "Transcription" box and press Apply):
   - `aghdgomasa-shensa.json` — Easter hymn, 3 voices (the built-in example)
@@ -60,3 +62,4 @@ Plain JavaScript, no frameworks. Colours are CSS variables on `:root` with dark-
 - Transpose (Nov 2026): "transpose" in the score (−12..12 semitones, optional) is added to every part's octaveShift in `normalizePiece`, so playback, roll and singing targets move; written notes stay. Control in the editing-mode toolbar, `setTranspose` (in editing mode it is an undoable edit; edit parts' `shift` includes it and `edToRaw` subtracts it). Saved with projects.
 - Note names in editing mode (labels on notes, octave labels on the semitone guides, the "Selected" line) show the sounding pitch: written + octaveShift + transpose, so they match what is heard and the singing meter.
 - Sing to edit (Nov 2026, editing mode): `recStart` (mic via `ensureMic`, mutes the part, count-in clicks, plays from the range start), `recLoop` (pitch per frame via `pumpPitch`, latency-compensated position → plain beats), `recFinish` (Fix pitches: median sung pitch per note, keeping rhythm; New notes: median per grid step, same pitch merged, range replaced). Range = selected notes of the part, or from the playhead's bar until Stop/Space. "Match the part's octave" shifts the whole take by whole octaves. One undo step.
+- Two versions (Nov 2026): `index.html` (hosted on GitHub Pages at iliakhaburdzania.github.io/poliphony-player) is the user version: song list from songs.json, listening, singing mode. `?studio` (studio.html) adds the studio-only panels (class `studio-only`: reading scores, editing mode + projects, transcription) and "Add to song library" (`libAdd`, downloads an updated songs.json for the user to commit). `STUDIO` flag, `loadLibrary`, `chooseSong`, `showLibrary`; the user version remembers the last song (localStorage `pp.song`). EXAMPLE (built-in default) is the user's Ceduri Mravaljamier version (transpose -2, 4 parts, tempo 72); keep it equal to the first song in songs.json. Transpose is only in the studio (editing toolbar).
