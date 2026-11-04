@@ -2031,8 +2031,7 @@ cv.addEventListener('pointermove', e => {
   const list = lyList(d.v), sy = list[d.i], prev = list[d.i - 1], next = list[d.i + 1];
   const t = plainOf(geo().B(x)), total = plainP[plainP.length - 1], minLen = 0.125;
   if (d.kind === 'end') {
-    const adjacent = next && Math.abs(next.t - (sy.t + sy.d)) < 1e-3;
-    const limit = next ? (adjacent ? next.t + next.d - minLen : next.t) : total;
+    const limit = next ? next.t : total;
     d.nd = Math.min(limit, Math.max(sy.t + minLen, snapPlain(t))) - sy.t;
   } else {
     const joinP = prev && Math.abs(prev.t + prev.d - sy.t) < 1e-3, joinN = next && Math.abs(sy.t + sy.d - next.t) < 1e-3;
@@ -2053,11 +2052,8 @@ cv.addEventListener('pointerup', e => {
   if (d.kind === 'move' && Math.abs(d.dt) < 1e-6) { draw(); return; }
   lyCommit(d.v, list => {
     const sy = list[d.i];
-    if (d.kind === 'end') {
-      const oldEnd = sy.t + sy.d, nx = list[d.i + 1];
-      sy.d = d.nd;
-      if (nx && Math.abs(nx.t - oldEnd) < 1e-3) { const ne = nx.t + nx.d; nx.t = sy.t + sy.d; nx.d = ne - nx.t; }
-    } else {
+    if (d.kind === 'end') sy.d = d.nd;
+    else {
       const pv = list[d.i - 1], nx = list[d.i + 1];
       if (pv && d.joinP) pv.d += d.dt;
       if (nx && d.joinN) { nx.t += d.dt; nx.d -= d.dt; }
@@ -2123,10 +2119,6 @@ function drawLyrics(g, G, X) {
     L.forEach((sy, i) => {
       let t = sy.t, dd = sy.d;
       if (d && d.v === vi && d.i === i) { if (d.kind === 'end') dd = d.nd; else t = d.nt; }
-      if (d && d.v === vi && d.kind === 'end' && d.i === i - 1) {
-        const p = L[i - 1];
-        if (Math.abs(sy.t - (p.t + p.d)) < 1e-3) { const e = sy.t + sy.d; t = p.t + d.nd; dd = e - t; }
-      }
       if (d && d.v === vi && d.kind === 'move') {       // joined neighbours follow the word being moved
         if (d.i === i + 1 && d.joinP) dd = sy.d + d.dt;
         if (d.i === i - 1 && d.joinN) { t = sy.t + d.dt; dd = sy.d - d.dt; }
