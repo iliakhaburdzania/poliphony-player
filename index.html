@@ -357,7 +357,7 @@ body.studio .user-only { display: none !important; }
 
   <section class="panel roll" aria-label="Score view">
     <div class="rolltools">
-      <span class="note">Space plays and pauses. Click or drag on the score to move the playhead.<span class="studio-only"> Words: click one to edit it, drag it to move it (joined neighbours follow), drag the tick at the end of its line to change how long it lasts, double-click empty space in a part to add one.</span></span>
+      <span class="note">Space plays and pauses. Click or drag on the score to move the playhead.<span class="studio-only"> Words: click one to edit it, drag it to move it (joined neighbours follow), drag its right edge to change how long it lasts, double-click empty space above a part's notes to add one.</span></span>
       <div class="seg" role="group" aria-label="Zoom">
         <button class="small" id="zOut" type="button" aria-label="Zoom out">&minus;</button>
         <button class="small" id="zIn" type="button" aria-label="Zoom in">+</button>
@@ -1996,7 +1996,6 @@ function lyTextW(text) {
   lyMeasure.font = '600 12px ' + cssVar('--font-body');
   return lyMeasure.measureText(text || '…').width;
 }
-function lyBoxW(text, x0, nx) { return Math.max(12, Math.min(lyTextW(text) + 8, nx - x0 - 3)); }
 function lyHit(x, y) {
   if (!STUDIO || !piece || piece.audio) return null;
   const { top, laneH, gap } = rollGeo, v = Math.floor((y - top) / (laneH + gap));
@@ -2004,9 +2003,8 @@ function lyHit(x, y) {
   const G = geo(), L = lyList(v);
   for (let i = L.length - 1; i >= 0; i--) {
     const sy = L[i], x0 = G.X(tlOf(sy.t)), x1 = G.X(tlOf(sy.t + sy.d, true)), yb = lyBase(v, sy.t);
-    const nx = i + 1 < L.length ? G.X(tlOf(L[i + 1].t)) : x1 + 300;
-    if (Math.abs(x - x1) <= 6 && y >= yb + 2 && y <= yb + 11) return { v, i, edge: true };       // the tick at the end of its line
-    if (y >= yb - 13 && y <= yb + 5 && x >= x0 - 1 && x <= x0 + lyBoxW(sy.text, x0, nx) + 1) return { v, i, edge: false };   // its box
+    if (y < yb - 14 || y > yb + 5 || x < x0 - 1 || x > Math.max(x1, x0 + 12) + 3) continue;          // its box
+    return { v, i, edge: x >= Math.max(x1, x0 + 12) - 7 };                                           // right edge: its length
   }
   return { v, i: -1 };
 }
@@ -2128,21 +2126,19 @@ function drawLyrics(g, G, X) {
       const x0 = X(tlOf(t)), x1 = X(tlOf(t + dd, true));
       if (x1 < sl - 40 || x0 > sl + vw + 10) return;
       const yb = lyBase(vi, t), on = now >= t && now < t + dd, sel = open && ly.sel && ly.sel.v === vi && ly.sel.i === i;
-      const nx = i + 1 < L.length ? X(tlOf(L[i + 1].t)) : x1 + 300;
-      if (STUDIO) {                                    // how long the word lasts, with a handle at its end
-        g.globalAlpha = sel ? 1 : on ? 0.9 : 0.45; g.strokeStyle = sel || on ? acc : muted; g.lineWidth = sel ? 2 : 1;
-        g.beginPath(); g.moveTo(x0 + 1, yb + 7.5); g.lineTo(x1 - 1, yb + 7.5); g.stroke();
-        g.beginPath(); g.moveTo(x1 - 1, yb + 3); g.lineTo(x1 - 1, yb + 11); g.stroke();
-      }
       const text = sy.text || (STUDIO ? '…' : '');
-      if (!text) return;
-      // the word in its own box
-      g.font = (on || sel ? '700 ' : '600 ') + '12px ' + cssVar('--font-body');
-      const bw = lyBoxW(text, x0, nx);
+      if (!text && !STUDIO) return;
+      // the word in a box as long as the time it is sung
+      const bw = Math.max(12, x1 - x0 - 1);
       g.globalAlpha = 1; g.fillStyle = bg;
       g.beginPath(); g.roundRect(x0 + 0.5, yb - 12.5, bw, 16, 3); g.fill();
       g.strokeStyle = sel || on ? acc : line; g.lineWidth = sel ? 2 : 1; g.stroke();
-      g.save(); g.beginPath(); g.rect(x0 + 2, yb - 13, Math.max(0, bw - 3), 18); g.clip();
+      if (STUDIO && bw > 16) {                         // grip at the right edge: drag it to change the length
+        g.globalAlpha = sel ? 0.9 : 0.5; g.fillStyle = sel ? acc : muted;
+        g.fillRect(x0 + bw - 4, yb - 8.5, 1.5, 8); g.globalAlpha = 1;
+      }
+      g.font = (on || sel ? '700 ' : '600 ') + '12px ' + cssVar('--font-body');
+      g.save(); g.beginPath(); g.rect(x0 + 2, yb - 13, Math.max(0, bw - (STUDIO ? 8 : 3)), 18); g.clip();
       g.fillStyle = on || sel ? acc : ink; g.fillText(text, x0 + 4.5, yb);
       g.restore();
     });
