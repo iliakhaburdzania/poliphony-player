@@ -342,7 +342,7 @@ body.studio .user-only { display: none !important; }
       </div>
       <p class="note edinfo" id="edInfo"></p>
       <p class="note">Sing to edit: select the notes to redo (or put the playhead where to start), choose the part and press Record. After a count-in the other voices play while you sing; headphones help. Fix pitches keeps the rhythm; New notes writes what you sang on the grid.</p>
-      <p class="note">Words: click a word above the notes to change it (Enter goes to the next one), drag it to move it, drag its right edge to make it longer or shorter, double-click empty space above a part's notes to add one. With a word selected, ←/→ move it and Delete removes it. Ctrl+Z / Ctrl+Y undo and redo notes and words alike. Save (Ctrl+S) keeps the song in songs.json.</p>
+      <p class="note">Words: click a word above the notes to change it (Enter goes to the next one), drag it to move it, drag its right edge to make it longer or shorter, double-click empty space above a part's notes to add one. Shift-click or drag a box to select several; Ctrl+C copies them, click where they should go in another part and press Ctrl+V. With one word selected, ←/→ move it; Delete removes the selected words. Ctrl+Z / Ctrl+Y undo and redo notes and words alike. Save (Ctrl+S) keeps the song in songs.json.</p>
       <p class="note">Drag a note to move it in time and pitch; drag its right end to change its length. Drag on empty space to select several notes, Shift-click to add one. Arrow keys move the selection (Shift+↑/↓ by an octave). Click empty space to move the playhead, or drag the playhead line or the bar numbers; Paste and Insert pause work there. A pause adds silence in all voices and moves the rest of the piece later.</p>
       <div class="actions" hidden>
         <input id="projName" type="text" placeholder="Project name" aria-label="Project name" maxlength="80">
@@ -1289,7 +1289,7 @@ cv.addEventListener('pointerdown', e => {
     ed.drag = { kind: 'new', x0: x, y0: y, v: hit.v, n, t0: t, dd: 0, moved: true };
   } else {
     if (!add) ed.sel.clear();
-    ed.drag = { kind: 'box', x0: x, y0: y, x1: x, y1: y, base: new Set(ed.sel), moved: false };
+    ed.drag = { kind: 'box', x0: x, y0: y, x1: x, y1: y, base: new Set(ed.sel), add, moved: false };
   }
   draw();
 });
@@ -1329,6 +1329,7 @@ function edPointerUp(e) {
       const x0 = G.X(edTL(n.t)), x1 = G.X(edTL(n.t + n.d, true)), yc = laneYOf(v, n.midi + p.shift);
       if (x1 >= xa && x0 <= xb && yc >= ya - 3 && yc <= yb + 3) ed.sel.add(n.id);
     }));
+    lyBoxSelect(xa, xb, ya, yb, d.add);
     draw(); edShowState(); return;
   }
   if (d.kind === 'new') {
@@ -1369,6 +1370,7 @@ function edCopy() {
   if (!sel.length) return false;
   const t0 = Math.min(...sel.map(s => s.n.t));
   ed.clip = sel.map(s => ({ v: s.v, midi: s.n.midi, t: s.n.t - t0, d: s.n.d }));
+  ed.lastCopy = 'notes';
   edShowState(); return true;
 }
 function edPaste() {
@@ -1644,6 +1646,7 @@ function edShowState() {
   ['edDel', 'edUp', 'edDown', 'edCopy', 'edCut'].forEach(id => { $(id).disabled = !ed.sel.size; });
   $('edPaste').disabled = !(ed.clip && ed.clip.length);
   const sel = edSelected();
+  if (ly.multi.length > 1) { $('edInfo').textContent = ly.multi.length + ' words selected: Ctrl+C copies, Ctrl+X cuts, Delete removes.'; recParts(); projShowState(); return; }
   $('edInfo').textContent = sel.length === 1 ? 'Selected: ' + noteName(sel[0].n.midi + sel[0].p.shift) + ', ' + (+sel[0].n.d.toFixed(3)) + ' beats, ' + sel[0].p.name
     : sel.length ? sel.length + ' notes selected' : 'Click a note to select it, drag to select several.';
   recParts();
@@ -1656,7 +1659,7 @@ function edSetTool(t) {
 function setEditing(on) {
   if (on && (!piece || piece.audio)) return;
   if (on && sing.on) setSinging(false);
-  if (!on && !$('lyEdit').hidden) lyClose();
+  if (!on) { ly.multi = []; if (!$('lyEdit').hidden) lyClose(); }
   if (!on) { if (rec.counting) recStop(); else if (rec.on) { rec.on = false; rec.samples = []; recRestore(); } }
   ed.on = on;
   $('editOn').setAttribute('aria-pressed', String(on));
@@ -1689,6 +1692,12 @@ $('edDelBar').addEventListener('click', () => edBars(false));
 document.addEventListener('keydown', e => {
   if (!ed.on || !ed.model || typing(e.target) || /^(SELECT|INPUT)$/.test(e.target.tagName)) return;
   const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (mod && k === 'v' && ed.lastCopy === 'words' && ly.clip) { e.preventDefault(); lyPaste(); return; }
+  if (ly.multi.length && mod && (k === 'c' || k === 'x')) { e.preventDefault(); if (lyCopy() && k === 'x') lyDeleteSel(); return; }
+  if (ly.multi.length > 1 && !mod) {                        // several words selected
+    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); lyDeleteSel(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); ly.multi = []; draw(); edShowState(); return; }
+  }
   if (ly.sel && !$('lyEdit').hidden && !mod) {               // a word is selected
     let w = true;
     if (e.key === 'Delete' || e.key === 'Backspace') $('lyDelete').click();
@@ -1984,7 +1993,9 @@ function lyBase(v, t) {
   const { top, laneH, gap } = rollGeo, y0 = top + v * (laneH + gap);
   return m == null ? y0 + 34 : Math.max(y0 + 30, laneYOf(v, m) - 18);
 }
-const ly = { drag: null, sel: null };      // sel = { v, i } open in the editor
+const ly = { drag: null, sel: null, multi: [], clip: null, clipT0: 0, clipV: 0, target: null, pasteAt: null };
+// sel = { v, i } open in the editor; multi = selected words [{ v, t }]; clip = copied words; target/pasteAt = where
+// the last click in a part was (paste goes there; without one, at the same moment in the copied part)
 function lyList(v) { return (piece.voices[v] && piece.voices[v].lyr) || []; }
 // every lyric change goes through here: an undo step in editing mode, otherwise a rebuild of the score
 function lyCommit(v, fn) {
@@ -2023,10 +2034,23 @@ function lyHit(x, y) {
 function lyPoint(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
 cv.addEventListener('pointerdown', e => {
   if (e.button > 0) return;
-  const { x, y } = lyPoint(e), h = lyHit(x, y);
-  if (!h || h.i < 0) return;                       // not on a word: the score's own click and drag
+  const { x, y } = lyPoint(e), h = lyHit(x, y), add = e.shiftKey || e.ctrlKey || e.metaKey;
+  if (!h || h.i < 0) {                             // not on a word: the score's own click and drag
+    if (ed.on && h && h.i < 0) { ly.target = h.v; ly.pasteAt = snapPlain(plainOf(geo().B(x))); }
+    if (ed.on && !add && ly.multi.length && !inScrubZone(x, y)) { ly.multi = []; if (!$('lyEdit').hidden) lyClose(); }
+    return;
+  }
   e.stopImmediatePropagation(); e.preventDefault();
-  const sy = lyList(h.v)[h.i];
+  const sy = lyList(h.v)[h.i], isSel = lyIsSel(h.v, sy.t);
+  ly.target = h.v; ly.pasteAt = sy.t;
+  if (add) {                                       // Shift/Ctrl-click: add or remove this word
+    ly.multi = isSel ? ly.multi.filter(m => !(m.v === h.v && Math.abs(m.t - sy.t) < 1e-3)) : ly.multi.concat([{ v: h.v, t: sy.t }]);
+    if (ly.multi.length === 1) { const m = ly.multi[0]; lyOpen(m.v, lyList(m.v).findIndex(w => Math.abs(w.t - m.t) < 1e-3)); }
+    else { if (!$('lyEdit').hidden) { $('lyEdit').hidden = true; ly.sel = null; } draw(); edShowState(); }
+    return;
+  }
+  ed.sel.clear();
+  if (!isSel) ly.multi = [{ v: h.v, t: sy.t }];
   ly.drag = { v: h.v, i: h.i, kind: h.edge ? 'end' : 'move', x0: x, t0: plainOf(geo().B(x)), nt: sy.t, nd: sy.d, dt: 0, moved: false };
   if (!h.edge) cv.style.cursor = 'grabbing';
   try { cv.setPointerCapture(e.pointerId); } catch (err) { /* pointer already gone */ }
@@ -2060,7 +2084,7 @@ cv.addEventListener('pointerup', e => {
   e.stopImmediatePropagation();
   ly.drag = null;
   cv.style.cursor = '';
-  if (!d.moved) { lyOpen(d.v, d.i); return; }
+  if (!d.moved) { if (ly.multi.length > 1) { ly.multi = [{ v: d.v, t: lyList(d.v)[d.i].t }]; } lyOpen(d.v, d.i); return; }
   if (d.kind === 'move' && Math.abs(d.dt) < 1e-6) { draw(); return; }
   lyCommit(d.v, list => {
     const sy = list[d.i];
@@ -2085,6 +2109,69 @@ cv.addEventListener('dblclick', e => {
   lyCommit(h.v, list => list.push({ t, d, text: '' }));
   lyOpen(h.v, lyList(h.v).findIndex(sy => Math.abs(sy.t - t) < 1e-3));
 });
+
+// several words: selection, copy, paste, delete (one undo step each)
+function lyIsSel(v, t) { return ly.multi.some(m => m.v === v && Math.abs(m.t - t) < 1e-3); }
+function lySelected() {
+  return ly.multi.map(m => { const L = lyList(m.v), i = L.findIndex(w => Math.abs(w.t - m.t) < 1e-3); return i >= 0 ? { v: m.v, i, w: L[i] } : null; })
+    .filter(Boolean).sort((a, b) => a.v - b.v || a.w.t - b.w.t);
+}
+function lyBoxSelect(xa, xb, ya, yb, add) {
+  if (!add) ly.multi = [];
+  const G = geo();
+  piece.voices.forEach((v, vi) => (v.lyr || []).forEach(w => {
+    const x0 = G.X(tlOf(w.t)), x1 = G.X(tlOf(w.t + w.d, true)), y = lyBase(vi, w.t);
+    if (x1 >= xa && x0 <= xb && y >= ya - 4 && y - 12 <= yb && !lyIsSel(vi, w.t)) ly.multi.push({ v: vi, t: w.t });
+  }));
+  if (!$('lyEdit').hidden) { $('lyEdit').hidden = true; ly.sel = null; }
+}
+// one undo step that may change the words of several parts: fn(list(v)) gets each part's word list
+function lyChangeAll(fn) {
+  const touched = new Set();
+  edChange(() => {
+    fn(v => { const p = ed.model.parts[v]; if (!p.lyr) p.lyr = lyList(v).map(x => ({ t: x.t, d: x.d, text: x.text })); touched.add(v); return p.lyr; });
+    touched.forEach(v => { const L = ed.model.parts[v].lyr; L.forEach(x => { x.t = +x.t.toFixed(4); x.d = +x.d.toFixed(4); }); L.sort((a, b) => a.t - b.t); });
+    if (touched.has(0)) ed.model.meta.lyrics = lyPerBar(ed.model.parts[0].lyr, ed.P);
+  });
+}
+function lyCopy() {
+  const items = lySelected();
+  if (!items.length) return false;
+  const v0 = items[0].v, mine = items.filter(x => x.v === v0), t0 = Math.min(...mine.map(x => x.w.t));
+  ly.clip = mine.map(x => ({ t: x.w.t - t0, d: x.w.d, text: x.w.text }));
+  ly.clipT0 = t0; ly.clipV = v0; ly.target = null; ly.pasteAt = null; ed.lastCopy = 'words';
+  $('edInfo').textContent = 'Copied ' + ly.clip.length + (ly.clip.length === 1 ? ' word' : ' words') + '. Click a part where they should go (or just pick the part) and press Ctrl+V.';
+  return true;
+}
+function lyDeleteSel() {
+  const items = lySelected();
+  if (!items.length) return;
+  lyChangeAll(list => {
+    const byV = {};
+    items.forEach(x => { (byV[x.v] = byV[x.v] || []).push(x.w.t); });
+    Object.keys(byV).forEach(v => { const L = list(+v); for (let k = L.length - 1; k >= 0; k--) if (byV[v].some(t => Math.abs(L[k].t - t) < 1e-3)) L.splice(k, 1); });
+  });
+  ly.multi = [];
+  if (!$('lyEdit').hidden) lyClose(); else draw();
+}
+// paste: into the part last clicked, at the clicked moment (or, if only a word was clicked or nothing, at the
+// same moment the words were copied from); words already there are replaced
+function lyPaste() {
+  if (!ly.clip || !ly.clip.length) return;
+  const v = ly.target != null ? ly.target : ly.clipV, t0 = ly.pasteAt != null && ly.target != null ? ly.pasteAt : ly.clipT0;
+  const total = plainP[plainP.length - 1];
+  const add = ly.clip.map(c => ({ t: t0 + c.t, d: Math.min(c.d, total - (t0 + c.t)), text: c.text })).filter(w => w.d > 0.05);
+  if (!add.length) return;
+  lyChangeAll(list => {
+    const L = list(v);
+    for (let k = L.length - 1; k >= 0; k--) if (add.some(w => L[k].t < w.t + w.d - 1e-3 && L[k].t + L[k].d > w.t + 1e-3)) L.splice(k, 1);
+    L.push(...add);
+  });
+  ly.multi = add.map(w => ({ v, t: +w.t.toFixed(4) }));
+  if (!$('lyEdit').hidden) { $('lyEdit').hidden = true; ly.sel = null; }
+  draw();
+  $('edInfo').textContent = 'Pasted ' + add.length + (add.length === 1 ? ' word' : ' words') + ' into ' + piece.voices[v].name + '. Ctrl+Z undoes it.';
+}
 function lyNudge(dir) {
   if (!ly.sel) return;
   const { v, i } = ly.sel, L = lyList(v), sy = L[i];
@@ -2106,6 +2193,7 @@ function lyOpen(v, i) {
   const L = lyList(v), sy = L[i];
   if (!sy) { lyClose(); return; }
   ly.sel = { v, i };
+  if (!(ly.multi.length === 1 && lyIsSel(v, sy.t))) ly.multi = [{ v, t: sy.t }];
   $('lyLabel').textContent = piece.voices[v].name + ' · word ' + (i + 1) + ' of ' + L.length + ' · bar ' + (barOfPlain(sy.t) + 1) + ' · ' + (+sy.d.toFixed(3)) + (sy.d === 1 ? ' beat' : ' beats');
   $('lyText').value = sy.text;
   $('lyPrev').disabled = i <= 0; $('lyNext').disabled = i >= L.length - 1;
@@ -2125,9 +2213,11 @@ function lyApply(goNext) {
 }
 $('lyApply').addEventListener('click', () => lyApply(false));
 $('lyDelete').addEventListener('click', () => {
+  if (ly.multi.length > 1) { lyDeleteSel(); return; }
   if (!ly.sel) return;
   const { v, i } = ly.sel;
   lyCommit(v, list => list.splice(i, 1));
+  ly.multi = [];
   if (lyList(v).length) lyOpen(v, Math.min(i, lyList(v).length - 1)); else lyClose();
 });
 $('lyClose').addEventListener('click', lyClose);
@@ -2160,7 +2250,7 @@ function drawLyrics(g, G, X) {
       }
       const x0 = X(tlOf(t)), x1 = X(tlOf(t + dd, true));
       if (x1 < sl - 40 || x0 > sl + vw + 10) return;
-      const yb = lyBase(vi, t), on = now >= t && now < t + dd, sel = open && ly.sel && ly.sel.v === vi && ly.sel.i === i;
+      const yb = lyBase(vi, t), on = now >= t && now < t + dd, sel = lyIsSel(vi, sy.t) || (open && ly.sel && ly.sel.v === vi && ly.sel.i === i);
       const text = sy.text || (STUDIO ? '…' : '');
       if (!text && !STUDIO) return;
       // the word in a box as long as the time it is sung
@@ -3043,7 +3133,7 @@ $('keyForget').addEventListener('click', () => {
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); EXAMPLE is used when it can't load.
 var STUDIO = /[?&]studio\b/.test(location.search);
-const BUILD = '4 Nov 2026, 20:50';   // shown in the header, to see which version a browser has
+const BUILD = '4 Nov 2026, 21:00';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
 $('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
 if (STUDIO) document.title = 'Polyphony Studio';
