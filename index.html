@@ -147,6 +147,7 @@ body.studio .user-only { display: none !important; }
 .singhead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
 .chk { display: flex; align-items: center; gap: 6px; font-size: 14px; }
 .chk input { accent-color: var(--accent); width: 16px; height: 16px; }
+.editp .singhead #projMsg { flex: 1 1 260px; }
 #singBody { display: flex; flex-direction: column; gap: 10px; }
 .live { display: flex; flex-direction: column; gap: 8px; background: var(--bg); border-radius: 8px; padding: 12px 14px; }
 .liverow { display: grid; grid-template-columns: 72px 72px minmax(160px, 1fr); align-items: center; gap: 8px 22px; }
@@ -193,6 +194,7 @@ body.studio .user-only { display: none !important; }
   <section class="panel library" aria-label="Songs">
     <h2>Songs</h2>
     <div class="songlist" id="songList"></div>
+    <div class="actions studio-only"><span class="note" id="libFileInfo"></span><button class="small" type="button" id="libConnect" hidden>Open songs.json</button></div>
     <p class="msg" id="libMsg"></p>
   </section>
 
@@ -289,9 +291,9 @@ body.studio .user-only { display: none !important; }
   <section class="panel editp studio-only" aria-label="Editing mode and projects">
     <div class="singhead">
       <button class="small toggle" id="editOn" type="button" aria-pressed="false" style="--c: var(--accent)">Editing mode</button>
-      <div class="ctl"><label for="projList">Project</label><select id="projList"></select></div>
-      <button class="small" id="projOpen" type="button">Open</button>
-      <button class="small" id="projDelete" type="button">Delete</button>
+      <button class="primary" id="songSave" type="button" title="Save this song into songs.json in the app folder (Ctrl+S)">Save</button>
+      <p class="msg" id="projMsg"></p>
+      <div hidden><select id="projList"></select><button id="projOpen" type="button"></button><button id="projDelete" type="button"></button></div>
     </div>
     <div id="editBody" class="editbody" hidden>
       <div class="edtools">
@@ -340,8 +342,9 @@ body.studio .user-only { display: none !important; }
       </div>
       <p class="note edinfo" id="edInfo"></p>
       <p class="note">Sing to edit: select the notes to redo (or put the playhead where to start), choose the part and press Record. After a count-in the other voices play while you sing; headphones help. Fix pitches keeps the rhythm; New notes writes what you sang on the grid.</p>
+      <p class="note">Words: click a word above the notes to change it (Enter goes to the next one), drag it to move it, drag its right edge to make it longer or shorter, double-click empty space above a part's notes to add one. With a word selected, ←/→ move it and Delete removes it. Ctrl+Z / Ctrl+Y undo and redo notes and words alike. Save (Ctrl+S) keeps the song in songs.json.</p>
       <p class="note">Drag a note to move it in time and pitch; drag its right end to change its length. Drag on empty space to select several notes, Shift-click to add one. Arrow keys move the selection (Shift+↑/↓ by an octave). Click empty space to move the playhead, or drag the playhead line or the bar numbers; Paste and Insert pause work there. A pause adds silence in all voices and moves the rest of the piece later.</p>
-      <div class="actions">
+      <div class="actions" hidden>
         <input id="projName" type="text" placeholder="Project name" aria-label="Project name" maxlength="80">
         <button class="primary" type="button" id="projSave">Save project</button>
         <button class="small" type="button" id="projSaveNew">Save as new</button>
@@ -352,12 +355,11 @@ body.studio .user-only { display: none !important; }
         <input id="projFile" type="file" accept=".json,application/json" hidden>
       </div>
     </div>
-    <p class="msg" id="projMsg"></p>
   </section>
 
   <section class="panel roll" aria-label="Score view">
     <div class="rolltools">
-      <span class="note">Space plays and pauses. Click or drag on the score to move the playhead.<span class="studio-only"> Words: click one to edit it, drag it to move it (joined neighbours follow), drag its right edge to change how long it lasts, double-click empty space above a part's notes to add one.</span></span>
+      <span class="note">Space plays and pauses. Click or drag on the score to move the playhead.<span class="studio-only"> In Editing mode, words too: click one to edit it, drag it to move it, drag its right edge to change how long it lasts, double-click above a part's notes to add one.</span></span>
       <div class="seg" role="group" aria-label="Zoom">
         <button class="small" id="zOut" type="button" aria-label="Zoom out">&minus;</button>
         <button class="small" id="zIn" type="button" aria-label="Zoom in">+</button>
@@ -1220,6 +1222,7 @@ function edRestore(json) {
   const ids = new Set(ed.model.parts.flatMap(p => p.notes.map(n => n.id)));
   ed.sel = new Set([...ed.sel].filter(id => ids.has(id)));
   ed.dirty = true; edRefresh();
+  if (ly.sel && !$('lyEdit').hidden) { const L = lyList(ly.sel.v); if (L.length) lyOpen(ly.sel.v, Math.min(ly.sel.i, L.length - 1)); else lyClose(); }
 }
 function edUndo() { if (!ed.undo.length) return; ed.redo.push(JSON.stringify(ed.model)); edRestore(ed.undo.pop()); }
 function edRedo() { if (!ed.redo.length) return; ed.undo.push(JSON.stringify(ed.model)); edRestore(ed.redo.pop()); }
@@ -1653,6 +1656,7 @@ function edSetTool(t) {
 function setEditing(on) {
   if (on && (!piece || piece.audio)) return;
   if (on && sing.on) setSinging(false);
+  if (!on && !$('lyEdit').hidden) lyClose();
   if (!on) { if (rec.counting) recStop(); else if (rec.on) { rec.on = false; rec.samples = []; recRestore(); } }
   ed.on = on;
   $('editOn').setAttribute('aria-pressed', String(on));
@@ -1685,6 +1689,16 @@ $('edDelBar').addEventListener('click', () => edBars(false));
 document.addEventListener('keydown', e => {
   if (!ed.on || !ed.model || typing(e.target) || /^(SELECT|INPUT)$/.test(e.target.tagName)) return;
   const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (ly.sel && !$('lyEdit').hidden && !mod) {               // a word is selected
+    let w = true;
+    if (e.key === 'Delete' || e.key === 'Backspace') $('lyDelete').click();
+    else if (e.key === 'ArrowLeft') lyNudge(-1);
+    else if (e.key === 'ArrowRight') lyNudge(1);
+    else if (e.key === 'Escape') lyClose();
+    else if (e.key === 'Enter') $('lyText').focus();
+    else w = false;
+    if (w) { e.preventDefault(); return; }
+  }
   let done = true;
   if (mod && k === 'z' && !e.shiftKey) edUndo();
   else if (mod && (k === 'y' || (k === 'z' && e.shiftKey))) edRedo();
@@ -1732,9 +1746,7 @@ function projList() {
 }
 function projMsg(t, bad) { const m = $('projMsg'); m.className = 'msg' + (bad ? ' bad' : ''); m.textContent = t; }
 function projShowState() {
-  const all = projAll();
-  if (all === null) { projMsg('Projects can’t be saved: this browser blocks storage for this page.', true); return; }
-  if (ed.dirty) projMsg(ed.project && all[ed.project] ? 'Unsaved changes to “' + all[ed.project].name + '”.' : 'Unsaved changes.');
+  if (ed.dirty) projMsg('Unsaved changes. Press Save (Ctrl+S) to keep them in songs.json.');
 }
 function projSave(asNew) {
   const raw = projCurrentRaw(), all = projAll();
@@ -1997,7 +2009,7 @@ function lyTextW(text) {
   return lyMeasure.measureText(text || '…').width;
 }
 function lyHit(x, y) {
-  if (!STUDIO || !piece || piece.audio) return null;
+  if (!STUDIO || !ed.on || !piece || piece.audio) return null;
   const { top, laneH, gap } = rollGeo, v = Math.floor((y - top) / (laneH + gap));
   if (v < 0 || v >= nV || y - top - v * (laneH + gap) > laneH) return null;
   const G = geo(), L = lyList(v);
@@ -2073,6 +2085,23 @@ cv.addEventListener('dblclick', e => {
   lyCommit(h.v, list => list.push({ t, d, text: '' }));
   lyOpen(h.v, lyList(h.v).findIndex(sy => Math.abs(sy.t - t) < 1e-3));
 });
+function lyNudge(dir) {
+  if (!ly.sel) return;
+  const { v, i } = ly.sel, L = lyList(v), sy = L[i];
+  if (!sy) return;
+  const prev = L[i - 1], next = L[i + 1], minLen = 0.125, total = plainP[plainP.length - 1];
+  const joinP = prev && Math.abs(prev.t + prev.d - sy.t) < 1e-3, joinN = next && Math.abs(sy.t + sy.d - next.t) < 1e-3;
+  const lo = prev ? (joinP ? prev.t + minLen : prev.t + prev.d) : 0, hi = next ? (joinN ? next.t + next.d - minLen : next.t) - sy.d : total - sy.d;
+  const nt = Math.max(lo, Math.min(hi, sy.t + dir * ((ed.on && ed.grid) || 0.25))), dt = nt - sy.t;
+  if (Math.abs(dt) < 1e-6) return;
+  lyCommit(v, list => {
+    const a = list[i - 1], b = list[i + 1];
+    if (a && joinP) a.d += dt;
+    if (b && joinN) { b.t += dt; b.d -= dt; }
+    list[i].t = nt;
+  });
+  lyOpen(v, i);
+}
 function lyOpen(v, i) {
   const L = lyList(v), sy = L[i];
   if (!sy) { lyClose(); return; }
@@ -2105,6 +2134,12 @@ $('lyClose').addEventListener('click', lyClose);
 $('lyPrev').addEventListener('click', () => { if (ly.sel) lyOpen(ly.sel.v, ly.sel.i - 1); });
 $('lyNext').addEventListener('click', () => { if (ly.sel) lyOpen(ly.sel.v, ly.sel.i + 1); });
 $('lyText').addEventListener('keydown', e => {
+  const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase(), L = ly.sel ? lyList(ly.sel.v) : [];
+  if (mod && (k === 'z' || k === 'y') && ly.sel && L[ly.sel.i] && $('lyText').value.trim() === L[ly.sel.i].text) {
+    e.preventDefault();
+    if (k === 'y' || e.shiftKey) edRedo(); else edUndo();
+    return;
+  }
   if (e.key === 'Enter') { e.preventDefault(); lyApply(true); }
   else if (e.key === 'Escape') { e.preventDefault(); lyClose(); }
 });
@@ -2950,7 +2985,7 @@ $('read').addEventListener('click', async () => {
       : await apiJSON(PROMPT, imgs, ctl.signal);
     }
     msg.textContent = loadRaw(raw, from) + (from === 'Loaded from MusicXML' ? '' : ' Listen with the score beside you and correct any note below.');
-    ed.project = null; ed.dirty = true; $('projName').value = '';
+    ed.project = null; ed.dirty = true; $('projName').value = ''; songKeyLoaded = null;
     $('editor').open = false;
   } catch (e) {
     msg.className = 'msg bad';
@@ -3008,7 +3043,7 @@ $('keyForget').addEventListener('click', () => {
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); EXAMPLE is used when it can't load.
 var STUDIO = /[?&]studio\b/.test(location.search);
-const BUILD = '4 Nov 2026, 20:25';   // shown in the header, to see which version a browser has
+const BUILD = '4 Nov 2026, 20:45';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
 $('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
 if (STUDIO) document.title = 'Polyphony Studio';
@@ -3033,6 +3068,7 @@ function chooseSong(i) {
   try { $('libMsg').className = 'msg'; $('libMsg').textContent = ''; loadRaw(sg, 'Loaded'); }
   catch (e) { $('libMsg').className = 'msg bad'; $('libMsg').textContent = 'This song could not be loaded: ' + (e && e.message || 'unknown error'); return; }
   if (STUDIO) { ed.project = null; ed.dirty = false; $('projName').value = ''; projMsg(''); }
+  songKeyLoaded = songKey(sg);
   lsSet('pp.song', songKey(sg));
   showLibrary();
 }
@@ -3076,10 +3112,103 @@ async function libAdd() {
 }
 $('libAdd').addEventListener('click', libAdd);
 
+/* ---------- saving songs (studio) ---------- */
+// Save writes the current song into songs.json in the app folder (File System Access API, Chrome/Edge):
+// the browser asks for the file once, keeps the link (IndexedDB) and later only asks for permission.
+// The studio also reads its song list from that file, so saved songs are there next time. Commit and push
+// to publish them to the player. Other browsers: Save downloads a new songs.json to put in the folder.
+let songKeyLoaded = null, songsHandle = null, songsConnected = false;
+function idbFile(op, val) {
+  return new Promise((res, rej) => {
+    const rq = indexedDB.open('polyphony', 1);
+    rq.onupgradeneeded = () => rq.result.createObjectStore('kv');
+    rq.onerror = () => rej(rq.error);
+    rq.onsuccess = () => {
+      const st = rq.result.transaction('kv', op === 'get' ? 'readonly' : 'readwrite').objectStore('kv');
+      const r = op === 'get' ? st.get('songsFile') : st.put(val, 'songsFile');
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    };
+  });
+}
+// a link to songs.json the page may read and write, or null; ask = allowed to show a dialog (needs a click)
+async function songsFile(ask) {
+  if (!window.showOpenFilePicker) return null;
+  if (!songsHandle) { try { songsHandle = (await idbFile('get')) || null; } catch (e) { /* storage blocked */ } }
+  if (songsHandle) {
+    let p = 'denied';
+    try { p = await songsHandle.queryPermission({ mode: 'readwrite' }); if (p !== 'granted' && ask) p = await songsHandle.requestPermission({ mode: 'readwrite' }); } catch (e) { /* file gone */ }
+    if (p === 'granted') return songsHandle;
+    if (!ask) return null;
+  }
+  if (!ask) return null;
+  const [h] = await window.showOpenFilePicker({ id: 'songs', types: [{ description: 'Song library (songs.json)', accept: { 'application/json': ['.json'] } }] });
+  if ((await h.requestPermission({ mode: 'readwrite' })) !== 'granted') return null;
+  songsHandle = h;
+  try { await idbFile('put', h); } catch (e) { /* remembered for this visit only */ }
+  return h;
+}
+async function readSongs(h) {
+  const j = JSON.parse((await (await h.getFile()).text()) || '{"songs":[]}');
+  if (!j || !Array.isArray(j.songs)) throw new Error(h.name + ' is not a song library');
+  return j.songs.filter(x => x && Array.isArray(x.voices));
+}
+function showSongsFile() {
+  if (!STUDIO) return;
+  const api = !!window.showOpenFilePicker;
+  $('libFileInfo').textContent = !api ? 'This browser can’t save into files: Save downloads a new songs.json to put in the app folder. Chrome or Edge save directly.'
+    : songsConnected ? 'Songs from ' + songsHandle.name + ' in your app folder; Save writes there.'
+      : songsHandle ? 'Open songs.json again to see your saved songs (the browser asks once per visit).' : 'The first Save asks for songs.json in the app folder; after that the studio shows the songs from it.';
+  $('libConnect').hidden = !api || !songsHandle || songsConnected;
+}
+async function songSave() {
+  if (!STUDIO) return;
+  const raw = projCurrentRaw();
+  if (!raw) return;
+  if (!window.showOpenFilePicker) { await libAdd(); ed.dirty = false; songKeyLoaded = songKey(raw); return; }
+  let h;
+  try {
+    if (!songsHandle) projMsg('Choose songs.json in the app folder (only the first time).');
+    h = await songsFile(true);
+  } catch (e) { projMsg(e && e.name === 'AbortError' ? 'Not saved: no file was chosen.' : 'Couldn’t open songs.json: ' + (e && e.message || e), true); return; }
+  if (!h) { projMsg('Not saved: the browser wasn’t allowed to change songs.json.', true); return; }
+  try {
+    const songs = await readSongs(h);
+    let i = songKeyLoaded ? songs.findIndex(x => songKey(x) === songKeyLoaded) : -1;
+    if (i < 0) i = songs.findIndex(x => songKey(x) === songKey(raw));
+    if (i >= 0) songs[i] = raw; else songs.push(raw);
+    const w = await h.createWritable();
+    await w.write(JSON.stringify({ songs }, null, 1) + '\n');
+    await w.close();
+    library = songs; songKeyLoaded = songKey(raw); ed.dirty = false; songsConnected = true;
+    showLibrary(); showSongsFile();
+    projMsg('Saved “' + raw.title + '” in ' + h.name + (h.name === 'songs.json' ? '' : ' (the player reads songs.json)') + '. Commit and push to publish it.');
+  } catch (e) { projMsg('Couldn’t save: ' + (e && e.message || e), true); }
+}
+// studio start: read the songs from songs.json (when the browser still allows it) and show the saved version
+async function studioLibrary(ask) {
+  if (!STUDIO || !window.showOpenFilePicker) { showSongsFile(); return; }
+  try {
+    const h = await songsFile(ask);
+    if (h) {
+      library = await readSongs(h); songsConnected = true;
+      const want = songKeyLoaded || lsGet('pp.song'), i = library.findIndex(x => songKey(x) === want);
+      if (!ed.dirty && library.length) chooseSong(i >= 0 ? i : 0);
+    }
+  } catch (e) { if (ask && !(e && e.name === 'AbortError')) { $('libMsg').className = 'msg bad'; $('libMsg').textContent = 'Couldn’t read songs.json: ' + (e && e.message || e); } }
+  showLibrary(); showSongsFile();
+}
+$('songSave').addEventListener('click', songSave);
+$('libConnect').addEventListener('click', () => studioLibrary(true));
+document.addEventListener('keydown', e => {
+  if (STUDIO && (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); songSave(); }
+});
+
+
 loadRaw(EXAMPLE, 'Example');
 $('readMsg').textContent = '';
+songKeyLoaded = songKey(EXAMPLE);
 showLibrary();
-loadLibrary();
+loadLibrary().then(() => studioLibrary(false));
 </script>
 
 </body>
