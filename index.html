@@ -107,7 +107,7 @@ input[type=range] { accent-color: var(--accent); }
 .roll { padding: 12px; }
 .rollwrap { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
 canvas { display: block; cursor: pointer; }
-.rolltools { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+.rolltools { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 10px; }
 .seg { display: flex; gap: 4px; }
 .seg .small { padding: 4px 10px; }
 .seg [aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
@@ -225,32 +225,6 @@ body.studio .user-only { display: none !important; }
     </div>
   </section>
 
-  <section class="panel transport" aria-label="Playback">
-    <button id="playAll" class="primary" type="button" aria-keyshortcuts="Space">Play</button>
-    <button id="toStart" class="small" type="button" aria-label="Back to the start">⏮ Start</button>
-    <div class="ctl">
-      <label for="tempo">Tempo</label>
-      <input id="tempo" type="range" min="40" max="160" value="72">
-      <output id="tempoOut">72</output>
-    </div>
-    <div class="ctl user-only" title="Move the whole song up or down by semitones, to suit your voice; double-click the number for the song's key">
-      <label for="keyUp2">Transpose</label>
-      <button class="small keybtn" id="keyDown2" type="button" aria-label="Transpose down a semitone">&minus;</button>
-      <output id="keyOut2" aria-live="polite">0</output>
-      <button class="small keybtn" id="keyUp2" type="button" aria-label="Transpose up a semitone">+</button>
-    </div>
-    <div class="ctl" id="repsCtl">
-      <label for="reps">Repeat</label>
-      <select id="reps"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option></select>
-    </div>
-    <div class="status" id="status">bar 1</div>
-    <div class="seek" title="Drag to any point, or click the piano roll or a lyric to jump there">
-      <label for="seek">Position</label>
-      <input id="seek" type="range" min="0" max="100" step="0.25" value="0" aria-label="Playback position">
-      <output id="seekOut" for="seek">0:00 / 0:00</output>
-    </div>
-  </section>
-
   <section class="panel sing" aria-label="Singing mode">
     <div class="singhead">
       <button class="small toggle" id="singOn" type="button" aria-pressed="false" style="--c: var(--accent)">Singing mode</button>
@@ -359,7 +333,6 @@ body.studio .user-only { display: none !important; }
 
   <section class="panel roll" aria-label="Score view">
     <div class="rolltools">
-      <span class="note">Space plays and pauses. Click or drag on the score to move the playhead.<span class="studio-only"> In Editing mode, words too: click one to edit it, drag it to move it, drag its right edge to change how long it lasts, double-click above a part's notes to add one.</span></span>
       <div class="seg" role="group" aria-label="Zoom">
         <button class="small" id="zOut" type="button" aria-label="Zoom out">&minus;</button>
         <button class="small" id="zIn" type="button" aria-label="Zoom in">+</button>
@@ -381,7 +354,33 @@ body.studio .user-only { display: none !important; }
         <p class="msg" id="lyMsg"></p>
       </div>
     </div>
-    <div class="lyrics" id="lyrics"></div>
+    <div class="lyrics" id="lyrics" style="display:none"></div>
+  </section>
+
+  <section class="panel transport" aria-label="Playback">
+    <button id="playAll" class="primary" type="button" aria-keyshortcuts="Space">Play</button>
+    <button id="toStart" class="small" type="button" aria-label="Back to the start">⏮ Start</button>
+    <div class="ctl">
+      <label for="tempo">Tempo</label>
+      <input id="tempo" type="range" min="40" max="160" value="72">
+      <output id="tempoOut">72</output>
+    </div>
+    <div class="ctl user-only" title="Move the whole song up or down by semitones, to suit your voice; double-click the number for the song's key">
+      <label for="keyUp2">Transpose</label>
+      <button class="small keybtn" id="keyDown2" type="button" aria-label="Transpose down a semitone">&minus;</button>
+      <output id="keyOut2" aria-live="polite">0</output>
+      <button class="small keybtn" id="keyUp2" type="button" aria-label="Transpose up a semitone">+</button>
+    </div>
+    <div class="ctl" id="repsCtl">
+      <label for="reps">Repeat</label>
+      <select id="reps"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option></select>
+    </div>
+    <div class="status" id="status">bar 1</div>
+    <div class="seek" title="Drag to any point, or click the piano roll or a lyric to jump there">
+      <label for="seek">Position</label>
+      <input id="seek" type="range" min="0" max="100" step="0.25" value="0" aria-label="Playback position">
+      <output id="seekOut" for="seek">0:00 / 0:00</output>
+    </div>
   </section>
 
   <details class="panel studio-only" id="editor">
@@ -3133,7 +3132,7 @@ $('keyForget').addEventListener('click', () => {
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); EXAMPLE is used when it can't load.
 var STUDIO = /[?&]studio\b/.test(location.search);
-const BUILD = '4 Nov 2026, 21:00';   // shown in the header, to see which version a browser has
+const BUILD = '4 Nov 2026, 21:05';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
 $('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
 if (STUDIO) document.title = 'Polyphony Studio';
