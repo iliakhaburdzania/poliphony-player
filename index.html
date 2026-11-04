@@ -90,7 +90,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 select { font: inherit; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
 input[type=range] { accent-color: var(--accent); }
 .keybtn { padding: 3px 10px; }
-#keyOut { min-width: 3.5ch; text-align: center; }
+#keyOut, #keyOut2 { min-width: 3.5ch; text-align: center; }
 .status { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
 
 .voices { display: flex; flex-direction: column; }
@@ -128,6 +128,7 @@ textarea { width: 100%; min-height: 260px; resize: vertical; font-family: var(--
 .sing { display: flex; flex-direction: column; gap: 14px; }
 .editp { display: flex; flex-direction: column; gap: 12px; }
 body:not(.studio) .studio-only { display: none !important; }
+body.studio .user-only { display: none !important; }
 .library { display: flex; flex-direction: column; gap: 10px; }
 .songlist { display: flex; flex-wrap: wrap; gap: 8px; }
 .song { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; min-width: 0; max-width: 100%; }
@@ -227,6 +228,12 @@ body:not(.studio) .studio-only { display: none !important; }
       <label for="tempo">Tempo</label>
       <input id="tempo" type="range" min="40" max="160" value="72">
       <output id="tempoOut">72</output>
+    </div>
+    <div class="ctl user-only" title="Move the whole song up or down by semitones, to suit your voice; double-click the number for the song's key">
+      <label for="keyUp2">Transpose</label>
+      <button class="small keybtn" id="keyDown2" type="button" aria-label="Transpose down a semitone">&minus;</button>
+      <output id="keyOut2" aria-live="polite">0</output>
+      <button class="small keybtn" id="keyUp2" type="button" aria-label="Transpose up a semitone">+</button>
     </div>
     <div class="ctl" id="repsCtl">
       <label for="reps">Repeat</label>
@@ -1744,9 +1751,11 @@ projList();
 /* ---------- transpose ---------- */
 function showKey() {
   const T = piece && !piece.audio ? piece.transpose || 0 : 0;
-  $('keyOut').textContent = T > 0 ? '+' + T : String(T);
-  $('keyOut').title = T ? (Math.abs(T) + (Math.abs(T) === 1 ? ' semitone ' : ' semitones ') + (T > 0 ? 'up' : 'down')) : 'Original key';
-  $('keyDown').disabled = !piece || !!piece.audio || T <= -12; $('keyUp').disabled = !piece || !!piece.audio || T >= 12;
+  ['', '2'].forEach(k => {
+    $('keyOut' + k).textContent = T > 0 ? '+' + T : String(T);
+    $('keyOut' + k).title = T ? (Math.abs(T) + (Math.abs(T) === 1 ? ' semitone ' : ' semitones ') + (T > 0 ? 'up' : 'down')) : 'Original key';
+    $('keyDown' + k).disabled = !piece || !!piece.audio || T <= -12; $('keyUp' + k).disabled = !piece || !!piece.audio || T >= 12;
+  });
 }
 // rebuilds the piece from new score data and keeps position, playback, mutes and volumes
 function rebuildKeeping(raw) {
@@ -1764,12 +1773,16 @@ function setTranspose(T) {
   const old = piece.transpose || 0;
   if (T === old) return;
   if (ed.on && ed.model) edChange(() => { ed.model.meta.transpose = T; ed.model.parts.forEach(p => { p.shift += T - old; }); ed.range = null; });
-  else { rebuildKeeping(Object.assign({}, curRaw, { tempo: +$('tempo').value, transpose: T })); ed.dirty = true; projShowState(); }
+  else { rebuildKeeping(Object.assign({}, curRaw, { tempo: +$('tempo').value, transpose: T })); if (STUDIO) { ed.dirty = true; projShowState(); } }
   showKey();
 }
 $('keyDown').addEventListener('click', () => setTranspose((piece && piece.transpose || 0) - 1));
 $('keyUp').addEventListener('click', () => setTranspose((piece && piece.transpose || 0) + 1));
 $('keyOut').addEventListener('dblclick', () => setTranspose(0));
+// user version: the playback-bar control; double-click returns to the key the song was published in
+$('keyDown2').addEventListener('click', () => setTranspose((piece && piece.transpose || 0) - 1));
+$('keyUp2').addEventListener('click', () => setTranspose((piece && piece.transpose || 0) + 1));
+$('keyOut2').addEventListener('dblclick', () => { const sg = library.find(x => songKey(x) === songKey(curRaw)); setTranspose(sg ? Math.round(+sg.transpose || 0) : 0); });
 
 /* ---------- transport, voices and seeking ---------- */
 async function togglePlay() {
