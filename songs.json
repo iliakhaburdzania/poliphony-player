@@ -3,7 +3,7 @@
   {
    "title": "Ceduri Mravaljamier",
    "subtitle": "Many Years (Georgian) · ცედური მრავალჟამიერ · Traditional",
-   "tempo": 72,
+   "tempo": 160,
    "repeatTimes": 1,
    "transpose": -2,
    "breathAfter": [],
@@ -244,7 +244,7 @@
       },
       {
        "t": 89,
-       "d": 9,
+       "d": 5.5,
        "text": "er!"
       }
      ]
@@ -462,7 +462,7 @@
       },
       {
        "t": 89,
-       "d": 9,
+       "d": 5.5,
        "text": "er!"
       }
      ]
@@ -675,7 +675,7 @@
       },
       {
        "t": 89,
-       "d": 9,
+       "d": 5.5,
        "text": "er!"
       }
      ]
@@ -888,7 +888,7 @@
       },
       {
        "t": 89,
-       "d": 9,
+       "d": 5.5,
        "text": "er!"
       }
      ]
