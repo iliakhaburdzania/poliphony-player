@@ -141,7 +141,7 @@ body.studio .user-only { display: none !important; }
 .edinfo { font-family: var(--font-mono); font-size: 12px; min-height: 1.4em; }
 #recBtn.rec { background: var(--bad); border-color: var(--bad); color: #fff; }
 .baredit { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding: 12px; border: 1px solid var(--accent); border-radius: 8px; background: var(--bg); }
-#beText { font: inherit; font-family: var(--font-mono); font-size: 14px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 100%; }
+#lyText { font: inherit; font-family: var(--font-mono); font-size: 14px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 100%; }
 #projName { font: inherit; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; flex: 1 1 200px; min-width: 0; }
 #projList { max-width: min(320px, 60vw); }
 .singhead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
@@ -357,25 +357,26 @@ body.studio .user-only { display: none !important; }
 
   <section class="panel roll" aria-label="Score view">
     <div class="rolltools">
-      <span class="note">Space plays and pauses. Click or drag on the score to move the playhead.<span class="studio-only"> Click a note to edit its bar.</span></span>
+      <span class="note">Space plays and pauses. Click or drag on the score to move the playhead.<span class="studio-only"> Lyrics line: click a syllable to edit it, drag its right end to change how long it lasts, drag it to move it, double-click empty space to add one.</span></span>
       <div class="seg" role="group" aria-label="Zoom">
         <button class="small" id="zOut" type="button" aria-label="Zoom out">&minus;</button>
         <button class="small" id="zIn" type="button" aria-label="Zoom in">+</button>
       </div>
     </div>
     <div class="rollwrap" id="rollwrap"><canvas id="roll" role="img" aria-label="Piano roll of the voices; click or drag to move the playhead"></canvas></div>
-    <div class="baredit studio-only" id="barEdit" hidden>
+    <div class="baredit studio-only" id="lyEdit" hidden>
       <div class="actions">
-        <b id="beLabel"></b>
-        <button class="small" type="button" id="bePrev" aria-label="Previous bar">&#9664;</button>
-        <button class="small" type="button" id="beNext" aria-label="Next bar">&#9654;</button>
-        <span class="note">NOTE:BEATS &middot; r = rest &middot; ~ = tie into the next bar &middot; + = stacked notes</span>
+        <b id="lyLabel"></b>
+        <button class="small" type="button" id="lyPrev" aria-label="Previous syllable">&#9664;</button>
+        <button class="small" type="button" id="lyNext" aria-label="Next syllable">&#9654;</button>
       </div>
-      <input id="beText" type="text" spellcheck="false" autocomplete="off" aria-label="Bar text">
+      <input id="lyText" type="text" spellcheck="false" autocomplete="off" aria-label="Syllable text">
       <div class="actions">
-        <button class="primary" type="button" id="beApply">Apply</button>
-        <button class="small" type="button" id="beCancel">Close</button>
-        <p class="msg" id="beMsg"></p>
+        <button class="primary" type="button" id="lyApply">Apply</button>
+        <button class="small" type="button" id="lyDelete">Delete</button>
+        <button class="small" type="button" id="lyClose">Close</button>
+        <span class="note">Enter applies and goes to the next syllable. End a syllable with - when the word goes on.</span>
+        <p class="msg" id="lyMsg"></p>
       </div>
     </div>
     <div class="lyrics" id="lyrics"></div>
@@ -650,7 +651,8 @@ function normalizePiece(raw) {
       subtitle: String(raw.subtitle || '').slice(0, 200),
       tempo: Math.max(40, Math.min(160, Math.round(Number(raw.tempo)) || 72)),
       reps: Math.max(1, Math.min(3, Math.round(Number(raw.repeatTimes)) || 1)), transpose,
-      voices: parts, breath: nums(raw.breathAfter), fermata: nums(raw.fermataBars), lyrics
+      voices: parts, breath: nums(raw.breathAfter), fermata: nums(raw.fermataBars), lyrics,
+      lyricsTimed: Array.isArray(raw.lyricsTimed) ? raw.lyricsTimed.map(x => ({ t: +(x && x.t), d: +(x && x.d), text: String(x && x.text != null ? x.text : '') })).filter(x => isFinite(x.t) && x.t >= 0 && x.d > 0).sort((a, b) => a.t - b.t) : null
     },
     warns, info,
     uncertain: Array.isArray(raw.uncertain) ? raw.uncertain.map(String).filter(Boolean).slice(0, 12) : []
@@ -693,6 +695,13 @@ function buildPiece(raw) {
     acc += L + (piece.breath.has(b + 1) ? BREATH : 0) + (piece.fermata.has(b + 1) ? FERMATA : 0);
   }
   PASS = acc;
+  plainP = [0];
+  barLen.forEach(l => plainP.push(plainP[plainP.length - 1] + l));
+  // lyrics on the timeline: as written in the score ("lyricsTimed"), or spread over the top part's notes
+  piece.lyricsExplicit = !!piece.lyricsTimed;
+  if (piece.audio) piece.lyricsTimed = [];
+  else if (piece.lyricsTimed) piece.lyrics = lyPerBar(piece.lyricsTimed, plainP);
+  else piece.lyricsTimed = lyDerive();
   events = [];
   if (piece.audio) piece.voices.forEach((v, vi) => v.notes.forEach(n => events.push({ v: vi, midi: n[0], start: n[1], dur: n[2], bar: Math.floor(n[1] / AUDIO_BAR) })));
   else piece.voices.forEach((v, vi) => {
@@ -965,18 +974,20 @@ function draw() {
   const dpr = window.devicePixelRatio || 1;
   const G = geo(), W = G.W, X = G.X;
   const staff = viewMode === 'staff' && !ed.on;
-  const laneH = staff ? 104 : ed.on && ed.range ? edLaneH() : (nV <= 3 ? 84 : 66), top = 24, gap = 8, H = top + nV * laneH + (nV - 1) * gap + 4;
+  const laneH = staff ? 104 : ed.on && ed.range ? edLaneH() : (nV <= 3 ? 84 : 66), top = 24, gap = 8;
+  const lyH = !piece.audio && (STUDIO || piece.lyricsTimed.length) ? 30 : 0, lyY = top + nV * (laneH + gap);
+  const H = top + nV * laneH + (nV - 1) * gap + (lyH ? gap + lyH : 0) + 4;
   if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     cv.style.width = W + 'px'; cv.style.height = H + 'px';
   }
-  rollGeo = { top, laneH, gap };
+  rollGeo = { top, laneH, gap, lyY, lyH };
   const g = cv.getContext('2d');
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, W, H);
   const line = cssVar('--line'), muted = cssVar('--muted'), ink = cssVar('--ink'), bg = cssVar('--bg');
   const cols = [cssVar('--v1'), cssVar('--v2'), cssVar('--v3'), cssVar('--v4')];
-  const bottom = top + nV * laneH + (nV - 1) * gap;
+  const bottom = top + nV * laneH + (nV - 1) * gap + (lyH ? gap + lyH : 0);
   const sl = wrap.scrollLeft;
   g.font = '11px ' + cssVar('--font-mono');
   g.textBaseline = 'alphabetic';
@@ -1042,6 +1053,7 @@ function draw() {
   });
   g.globalAlpha = 1;
   drawSinging(g, G, X, top, laneH, gap);
+  drawLyrics(g, G, X);
   // voice names stay at the visible left edge
   for (let vi = 0; vi < nV; vi++) {
     const y0 = top + vi * (laneH + gap);
@@ -1050,6 +1062,7 @@ function draw() {
     g.fillStyle = bg; g.globalAlpha = 0.85; g.fillRect(sl + G.x0, y0 + 2, tw + 12, 15); g.globalAlpha = 1;
     g.fillStyle = muted; g.fillText(label, sl + G.x0 + 6, y0 + 13);
   }
+  if (lyH && !piece.lyricsTimed.length) { g.fillStyle = muted; g.fillText('Lyrics · double-click to add a syllable', sl + G.x0 + 6, lyY + lyH / 2 + 4); }
   // playhead, kept in view while playing
   const px = Math.round(X(within)) + 0.5;
   g.strokeStyle = ink; g.lineWidth = 1.5;
@@ -1098,7 +1111,8 @@ function edFromPiece() {
   });
   ed.model = {
     meta: { title: piece.title, subtitle: piece.subtitle, tempo: +$('tempo').value || piece.tempo, repeatTimes: piece.reps,
-      transpose: piece.transpose || 0, breathAfter: [...piece.breath].sort((a, b) => a - b), fermataBars: [...piece.fermata].sort((a, b) => a - b), lyrics: piece.lyrics.slice() },
+      transpose: piece.transpose || 0, breathAfter: [...piece.breath].sort((a, b) => a - b), fermataBars: [...piece.fermata].sort((a, b) => a - b), lyrics: piece.lyrics.slice(),
+      lyricsTimed: piece.lyricsExplicit ? piece.lyricsTimed.map(x => ({ t: x.t, d: x.d, text: x.text })) : undefined },
     barLen, parts
   };
   ed.P = P; ed.sel.clear(); ed.range = null;
@@ -1378,6 +1392,7 @@ function edBars(add) {
       const nb = m.barLen.length;
       m.meta.breathAfter = m.meta.breathAfter.filter(b => b <= nb); m.meta.fermataBars = m.meta.fermataBars.filter(b => b <= nb);
       if (m.meta.lyrics) m.meta.lyrics = m.meta.lyrics.slice(0, nb);
+      if (m.meta.lyricsTimed) { m.meta.lyricsTimed = m.meta.lyricsTimed.filter(x => x.t < end - 1e-3); m.meta.lyricsTimed.forEach(x => { x.d = Math.min(x.d, end - x.t); }); }
     }
     edPrefix();
   });
@@ -1391,6 +1406,7 @@ function edInsertPause(len) {
   edChange(() => {
     const m = ed.model, b = at >= edTotal() - EPS ? m.barLen.length - 1 : edBarAt(at);
     m.barLen[b] += len;
+    if (m.meta.lyricsTimed) m.meta.lyricsTimed.forEach(x => { if (x.t >= at - EPS) x.t += len; else if (x.t + x.d > at + EPS) x.d += len; });
     m.parts.forEach(p => {
       const add = [];
       p.notes.forEach(n => {
@@ -1414,6 +1430,7 @@ function edRemovePause(len) {
   edChange(() => {
     m.barLen[b] -= len;
     m.parts.forEach(p => p.notes.forEach(n => { if (n.t >= end - EPS) n.t -= len; }));
+    if (m.meta.lyricsTimed) m.meta.lyricsTimed.forEach(x => { if (x.t >= end - EPS) x.t -= len; else if (x.t + x.d > at + EPS) x.d = Math.max(0.125, x.d - Math.min(len, x.t + x.d - at)); });
     edPrefix();
   });
   $('edInfo').textContent = 'Removed ' + len + (len === 1 ? ' beat' : ' beats') + ' of silence from bar ' + (b + 1) + '.';
@@ -1874,17 +1891,7 @@ function inScrubZone(x, y) {        // editing mode: the bar-number strip, or wi
 }
 cv.addEventListener('pointerdown', e => { if (!piece || ed.on || e.button > 0) return; scrubStart(e); scrub.x0 = e.clientX; scrub.y0 = e.clientY; scrub.moved = false; });
 cv.addEventListener('pointermove', e => { if (scrub) { if (Math.abs(e.clientX - (scrub.x0 || 0)) > 4) scrub.moved = true; showPos(scrubPos(e)); } });
-cv.addEventListener('pointerup', e => {
-  const clicked = scrub && scrub.x0 !== undefined && !scrub.moved;
-  scrubEnd();
-  if (clicked && STUDIO && !ed.on) { const h = rollNoteAt(e); if (h) barEditOpen(h.src, h.bi); }
-});
-// editing mode: double-click a note to open its bar in the bar editor
-cv.addEventListener('dblclick', e => {
-  if (!STUDIO || !ed.on || !ed.model) return;
-  const { x, y } = edPoint(e), hit = edHit(x, y);
-  if (hit && hit.n && piece.voices[hit.v]) barEditOpen(piece.voices[hit.v].src, edBarAt(edPlain(geo().B(x))));
-});
+cv.addEventListener('pointerup', scrubEnd);
 cv.addEventListener('pointercancel', scrubEnd);
 $('lyrics').addEventListener('click', e => {
   const b = e.target.closest('button');
@@ -1897,93 +1904,203 @@ try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () =
 new MutationObserver(() => draw()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => draw());
 
-/* ---------- bar editor and transcription links (studio) ---------- */
-// Click a note in the score to edit that bar's text for that part; click a bar in the Transcription box
-// to see it in the score. hiBar = { src: transcription voice index, bi: bar index } is highlighted.
-let hiBar = null, beAt = null;
-function rollNoteAt(e) {
-  const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-  const { top, laneH, gap } = rollGeo, v = Math.floor((y - top) / (laneH + gap));
-  if (v < 0 || v >= nV || piece.audio) return null;
-  const G = geo();
-  let best = null, bd = 9;
-  events.forEach(ev => {
-    if (ev.v !== v) return;
-    const x0 = G.X(ev.start), x1 = G.X(ev.start + ev.dur);
-    if (x < x0 - 3 || x > Math.max(x1, x0 + 4) + 3) return;
-    const dy = Math.abs(y - laneYOf(v, ev.midi));
-    if (dy < bd) { bd = dy; best = ev; }
-  });
-  if (!best) return null;
-  const beat = G.B(x);
-  let bi = 0;
-  while (bi < barStart.length - 1 && barStart[bi + 1] <= beat) bi++;
-  return { src: piece.voices[v].src, bi };
+/* ---------- lyrics on the timeline ---------- */
+// Each syllable has a start and a length in plain beats (no breath/fermata pauses): { t, d, text }.
+// Scores without "lyricsTimed" get them from the per-bar "lyrics": the syllables of a bar ("ja-mi-er,")
+// go on the top part's note starts in that bar, and the last one lasts to the end of the bar.
+// In the studio, click a syllable to edit it, drag its right end to change how long it lasts, drag it to
+// move it, and double-click empty space on the Lyrics line to add one.
+let plainP = [0];
+function tlOf(t, end) { let b = 0; while (b < plainP.length - 2 && (end ? t > plainP[b + 1] + 1e-6 : t >= plainP[b + 1] - 1e-6)) b++; return barStart[b] + (t - plainP[b]); }
+function plainOf(tb) {
+  let b = 0;
+  while (b < barStart.length - 1 && tb >= barStart[b + 1]) b++;
+  return plainP[b] + Math.max(0, Math.min(plainP[b + 1] - plainP[b], tb - barStart[b]));
 }
-// where bar bi of voice vi sits in the transcription text (JSON.stringify(raw, null, 1) layout or similar)
-function jsonBarRange(text, vi, bi) {
-  let at = -1;
-  for (let k = 0; k <= vi; k++) { at = text.indexOf('"bars"', at + 1); if (at < 0) return null; }
-  let i = text.indexOf('[', at);
-  for (let k = 0; ; k++) {
-    const a = text.indexOf('"', i + 1), close = text.indexOf(']', i + 1);
-    if (a < 0 || (close >= 0 && close < a)) return null;
-    const b = text.indexOf('"', a + 1);
-    if (b < 0) return null;
-    if (k === bi) return [a + 1, b];
-    i = b;
+function barOfPlain(t) { let b = 0; while (b < plainP.length - 2 && t >= plainP[b + 1] - 1e-6) b++; return b; }
+function snapPlain(t) {
+  const g = (ed.on && ed.grid) || 0.25, b = barOfPlain(t);
+  return Math.max(0, Math.min(plainP[plainP.length - 1], plainP[b] + Math.round((t - plainP[b]) / g) * g));
+}
+function lyPerBar(list, P) {
+  const out = Array(Math.max(0, P.length - 1)).fill('');
+  list.forEach(x => {
+    let b = 0;
+    while (b < P.length - 2 && x.t >= P[b + 1] - 1e-6) b++;
+    const tx = String(x.text || '').trim();
+    if (!tx) return;
+    out[b] = out[b] && !/-$/.test(out[b]) ? out[b] + ' ' + tx : out[b] + tx;
+  });
+  return out;
+}
+function lyDerive() {
+  const top = piece.voices[0], out = [];
+  let tied = false;
+  const starts = top.bars.map(bar => {
+    const st = [];
+    bar.forEach(n => { if (n.rest) { tied = false; return; } if (!tied) st.push(n.off); tied = !!n.tie; });
+    return st;
+  });
+  piece.lyrics.forEach((txt, bi) => {
+    const sy = String(txt || '').trim().split(/\s+/).filter(Boolean).flatMap(w => w.split(/(?<=-)(?=.)/));
+    if (!sy.length || bi >= top.bars.length) return;
+    const len = plainP[bi + 1] - plainP[bi], st = starts[bi].length ? starts[bi].slice() : [0];
+    // more syllables than notes: share the time after the last note start
+    if (sy.length > st.length) { const a = st[st.length - 1], step = (len - a) / (sy.length - st.length + 1); for (let k = 1; st.length < sy.length; k++) st.push(a + k * step); }
+    sy.forEach((text, k) => {
+      const t = st[k], e = k + 1 < sy.length ? st[k + 1] : len;
+      if (e - t > 1e-3) out.push({ t: plainP[bi] + t, d: e - t, text });
+    });
+  });
+  return out;
+}
+const ly = { drag: null, sel: -1 };
+// every lyric change goes through here: an undo step in editing mode, otherwise a rebuild of the score
+function lyCommit(fn) {
+  const fix = list => { list.forEach(x => { x.t = +x.t.toFixed(4); x.d = +x.d.toFixed(4); }); list.sort((a, b) => a.t - b.t); };
+  const base = () => piece.lyricsTimed.map(x => ({ t: x.t, d: x.d, text: x.text }));
+  if (ed.on && ed.model) {
+    edChange(() => { const m = ed.model.meta; if (!m.lyricsTimed) m.lyricsTimed = base(); fn(m.lyricsTimed); fix(m.lyricsTimed); m.lyrics = lyPerBar(m.lyricsTimed, ed.P); });
+  } else {
+    const raw = JSON.parse(JSON.stringify(curRaw));
+    if (!raw.lyricsTimed) raw.lyricsTimed = base();
+    fn(raw.lyricsTimed); fix(raw.lyricsTimed);
+    raw.lyrics = lyPerBar(raw.lyricsTimed, plainP);
+    rebuildKeeping(raw); ed.dirty = true; projShowState();
   }
 }
-function showBarText(vi, bi) {
-  const ta = $('json'), r = jsonBarRange(ta.value, vi, bi);
-  if (!r || !$('editor').open) return;
-  ta.setSelectionRange(r[0], r[1]);
-  const lines = ta.value.slice(0, r[0]).split('\n').length, lh = parseFloat(getComputedStyle(ta).lineHeight) || 18;
-  ta.scrollTop = Math.max(0, (lines - 4) * lh);
+function lyHit(x, y) {
+  const g = rollGeo;
+  if (!g.lyH || y < g.lyY || y > g.lyY + g.lyH) return null;
+  const G = geo();
+  let hit = { i: -1 };
+  piece.lyricsTimed.forEach((sy, i) => {
+    const x0 = G.X(tlOf(sy.t)), x1 = G.X(tlOf(sy.t + sy.d, true));
+    if (x >= x0 - 1 && x <= x1 + 1) hit = { i, edge: x >= x1 - 8 };
+  });
+  return hit;
 }
-function barEditOpen(vi, bi) {
-  if (!curRaw || !curRaw.voices[vi]) return;
-  bi = Math.max(0, Math.min(bi, (curRaw.voices[vi].bars || []).length - 1));
-  beAt = { vi, bi }; hiBar = { src: vi, bi };
-  $('beLabel').textContent = (curRaw.voices[vi].name || 'Part ' + (vi + 1)) + ' · bar ' + (bi + 1) + ' of ' + curRaw.voices[vi].bars.length;
-  $('beText').value = String(curRaw.voices[vi].bars[bi] == null ? '' : curRaw.voices[vi].bars[bi]);
-  $('beMsg').className = 'msg'; $('beMsg').textContent = '';
-  $('bePrev').disabled = bi <= 0; $('beNext').disabled = bi >= curRaw.voices[vi].bars.length - 1;
-  $('barEdit').hidden = false;
-  showBarText(vi, bi);
+function lyPoint(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+cv.addEventListener('pointerdown', e => {
+  if (!STUDIO || !piece || piece.audio || e.button > 0) return;
+  const { x, y } = lyPoint(e), h = lyHit(x, y);
+  if (!h) return;
+  e.stopImmediatePropagation(); e.preventDefault();
+  if (h.i < 0) return;                               // empty space: double-click adds a syllable
+  const sy = piece.lyricsTimed[h.i];
+  ly.drag = { i: h.i, kind: h.edge ? 'end' : 'move', x0: x, t0: plainOf(geo().B(x)), nt: sy.t, nd: sy.d, moved: false };
+  try { cv.setPointerCapture(e.pointerId); } catch (err) { /* pointer already gone */ }
+}, { capture: true });
+cv.addEventListener('pointermove', e => {
+  if (!STUDIO || !piece || piece.audio) return;
+  const { x, y } = lyPoint(e), d = ly.drag;
+  if (!d) {
+    const h = lyHit(x, y);
+    if (h) { e.stopImmediatePropagation(); cv.style.cursor = h.i < 0 ? 'copy' : h.edge ? 'ew-resize' : 'grab'; }
+    return;
+  }
+  e.stopImmediatePropagation();
+  if (Math.abs(x - d.x0) > 3) d.moved = true;
+  const list = piece.lyricsTimed, sy = list[d.i], prev = list[d.i - 1], next = list[d.i + 1];
+  const t = plainOf(geo().B(x)), total = plainP[plainP.length - 1], minLen = 0.125;
+  if (d.kind === 'end') {
+    const adjacent = next && Math.abs(next.t - (sy.t + sy.d)) < 1e-3;
+    const limit = next ? (adjacent ? next.t + next.d - minLen : next.t) : total;
+    d.nd = Math.min(limit, Math.max(sy.t + minLen, snapPlain(t))) - sy.t;
+  } else {
+    const lo = prev ? prev.t + prev.d : 0, hi = (next ? next.t : total) - sy.d;
+    d.nt = Math.max(lo, Math.min(hi, snapPlain(sy.t + (t - d.t0))));
+  }
   draw();
-  $('beText').focus(); $('beText').select();
-}
-function barEditClose() { $('barEdit').hidden = true; beAt = null; hiBar = null; draw(); }
-function barEditApply() {
-  if (!beAt || !curRaw) return;
-  const txt = $('beText').value.trim(), msg = $('beMsg');
-  if (!txt) { msg.className = 'msg bad'; msg.textContent = 'A bar needs at least one token, for example r:4 for a whole bar of rest.'; return; }
-  const raw = JSON.parse(JSON.stringify(curRaw));
-  raw.voices[beAt.vi].bars[beAt.bi] = txt;
-  const warns = [];
-  parseBarStr(txt, 'This bar', warns);
-  const before = ed.on && ed.model ? JSON.stringify(ed.model) : null;
-  let r;
-  try { r = rebuildKeeping(raw); } catch (e) { msg.className = 'msg bad'; msg.textContent = 'Could not apply: ' + (e && e.message || 'error'); return; }
-  if (ed.on) { edFromPiece(); if (before) { ed.undo.push(before); ed.redo = []; } edRanges(); edShowState(); }
-  ed.dirty = true; projShowState();
-  const len = lenOf(piece.voices[0].bars[beAt.bi]), mine = parseBarStr(txt, '', []).reduce((a, n) => a + n.dur, 0);
-  const note = Math.abs(mine - len) > 0.02 ? ' The bar is ' + (+mine.toFixed(3)) + ' beats here but ' + (+len.toFixed(3)) + ' in the longest part, so shorter parts get a rest.' : '';
-  msg.className = warns.length ? 'msg bad' : 'msg';
-  msg.textContent = (warns.length ? warns.join('; ') + '.' : 'Applied.') + note;
-  hiBar = { src: beAt.vi, bi: beAt.bi };
-  showBarText(beAt.vi, beAt.bi);
-  draw();
-}
-$('beApply').addEventListener('click', barEditApply);
-$('beCancel').addEventListener('click', barEditClose);
-$('bePrev').addEventListener('click', () => { if (beAt) barEditOpen(beAt.vi, beAt.bi - 1); });
-$('beNext').addEventListener('click', () => { if (beAt) barEditOpen(beAt.vi, beAt.bi + 1); });
-$('beText').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); barEditApply(); }
-  else if (e.key === 'Escape') { e.preventDefault(); barEditClose(); }
+}, { capture: true });
+cv.addEventListener('pointerup', e => {
+  const d = ly.drag;
+  if (!d) return;
+  e.stopImmediatePropagation();
+  ly.drag = null;
+  if (!d.moved) { lyOpen(d.i); return; }
+  lyCommit(list => {
+    const sy = list[d.i];
+    if (d.kind === 'end') {
+      const oldEnd = sy.t + sy.d, nx = list[d.i + 1];
+      sy.d = d.nd;
+      if (nx && Math.abs(nx.t - oldEnd) < 1e-3) { const ne = nx.t + nx.d; nx.t = sy.t + sy.d; nx.d = ne - nx.t; }
+    } else sy.t = d.nt;
+  });
+  if (!$('lyEdit').hidden) lyOpen(d.i);
+}, { capture: true });
+cv.addEventListener('pointercancel', () => { if (ly.drag) { ly.drag = null; draw(); } }, { capture: true });
+cv.addEventListener('dblclick', e => {
+  if (!STUDIO || !piece || piece.audio) return;
+  const { x, y } = lyPoint(e), h = lyHit(x, y);
+  if (!h || h.i >= 0) return;
+  const t = snapPlain(plainOf(geo().B(x))), next = piece.lyricsTimed.find(sy => sy.t > t + 1e-6);
+  const d = Math.min(1, (next ? next.t : plainP[plainP.length - 1]) - t);
+  if (d < 0.1) return;
+  lyCommit(list => list.push({ t, d, text: '' }));
+  lyOpen(piece.lyricsTimed.findIndex(sy => Math.abs(sy.t - t) < 1e-3));
 });
+function lyOpen(i) {
+  const sy = piece.lyricsTimed[i];
+  if (!sy) { lyClose(); return; }
+  ly.sel = i;
+  $('lyLabel').textContent = 'Syllable ' + (i + 1) + ' of ' + piece.lyricsTimed.length + ' · bar ' + (barOfPlain(sy.t) + 1) + ' · ' + (+sy.d.toFixed(3)) + (sy.d === 1 ? ' beat' : ' beats');
+  $('lyText').value = sy.text;
+  $('lyPrev').disabled = i <= 0; $('lyNext').disabled = i >= piece.lyricsTimed.length - 1;
+  $('lyMsg').textContent = '';
+  $('lyEdit').hidden = false;
+  draw();
+  $('lyText').focus(); $('lyText').select();
+}
+function lyClose() { $('lyEdit').hidden = true; ly.sel = -1; draw(); }
+function lyApply(goNext) {
+  const i = ly.sel;
+  if (i < 0 || !piece.lyricsTimed[i]) return;
+  const txt = $('lyText').value.trim();
+  if (txt !== piece.lyricsTimed[i].text) lyCommit(list => { list[i].text = txt; });
+  if (goNext && i + 1 < piece.lyricsTimed.length) lyOpen(i + 1); else lyOpen(i);
+}
+$('lyApply').addEventListener('click', () => lyApply(false));
+$('lyDelete').addEventListener('click', () => { const i = ly.sel; if (i < 0) return; lyCommit(list => list.splice(i, 1)); if (piece.lyricsTimed.length) lyOpen(Math.min(i, piece.lyricsTimed.length - 1)); else lyClose(); });
+$('lyClose').addEventListener('click', lyClose);
+$('lyPrev').addEventListener('click', () => lyOpen(ly.sel - 1));
+$('lyNext').addEventListener('click', () => lyOpen(ly.sel + 1));
+$('lyText').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); lyApply(true); }
+  else if (e.key === 'Escape') { e.preventDefault(); lyClose(); }
+});
+// drawn under the voice lanes: one box per syllable; the one being sung lights up
+function drawLyrics(g, G, X) {
+  const { lyY, lyH } = rollGeo;
+  if (!lyH) return;
+  const sl = wrap.scrollLeft, vw = wrap.clientWidth || G.W, line = cssVar('--line'), ink = cssVar('--ink'), acc = cssVar('--accent'), bg = cssVar('--bg');
+  g.fillStyle = bg; g.fillRect(G.x0, lyY, G.x1 - G.x0, lyH);
+  const now = session ? plainOf(locate(currentBeat()).within) : -1, d = ly.drag;
+  g.font = '13px ' + cssVar('--font-body'); g.textBaseline = 'middle';
+  piece.lyricsTimed.forEach((sy, i) => {
+    let t = sy.t, dd = sy.d;
+    if (d && d.i === i) { if (d.kind === 'end') dd = d.nd; else t = d.nt; }
+    if (d && d.kind === 'end' && d.i === i - 1) {
+      const p = piece.lyricsTimed[i - 1];
+      if (Math.abs(sy.t - (p.t + p.d)) < 1e-3) { const e = sy.t + sy.d; t = p.t + d.nd; dd = e - t; }
+    }
+    const x0 = X(tlOf(t)), x1 = X(tlOf(t + dd, true));
+    if (x1 < sl - 10 || x0 > sl + vw + 10) return;
+    const on = now >= t && now < t + dd, sel = i === ly.sel && !$('lyEdit').hidden;
+    g.globalAlpha = on ? 0.35 : 0.08; g.fillStyle = acc;
+    g.beginPath(); g.roundRect(x0 + 0.5, lyY + 3, Math.max(2, x1 - x0 - 1), lyH - 6, 3); g.fill();
+    g.globalAlpha = 1; g.strokeStyle = sel ? acc : line; g.lineWidth = sel ? 2 : 1; g.stroke();
+    if (STUDIO && x1 - x0 > 12) { g.globalAlpha = 0.5; g.fillStyle = sel ? acc : line; g.fillRect(x1 - 4, lyY + 8, 2, lyH - 16); g.globalAlpha = 1; }
+    g.save(); g.beginPath(); g.rect(x0 + 2, lyY, Math.max(0, x1 - x0 - 8), lyH); g.clip();
+    g.fillStyle = ink; g.fillText(sy.text || (STUDIO ? '…' : ''), x0 + 6, lyY + lyH / 2 + 1);
+    g.restore();
+  });
+  g.textBaseline = 'alphabetic'; g.font = '11px ' + cssVar('--font-mono');
+}
+
+/* ---------- transcription links (studio) ---------- */
+// Clicking a bar in the Transcription box highlights that bar (hiBar = { src: voice, bi: bar }) in the score.
+let hiBar = null;
 // the caret in the transcription text shows its bar in the score
 function jsonCaretBar() {
   const ta = $('json'), pos = ta.selectionStart, t = ta.value;
@@ -1999,7 +2116,7 @@ function jsonCaretBar() {
 function jsonShowBar() {
   if (!piece || piece.audio) return;
   const h = jsonCaretBar();
-  if (!h || h.bi >= barStart.length) { if (!beAt && hiBar) { hiBar = null; draw(); } return; }
+  if (!h || h.bi >= barStart.length) { if (hiBar) { hiBar = null; draw(); } return; }
   hiBar = { src: h.vi, bi: h.bi };
   if (!session) {
     const c = locate(cursor).p * (PASS + GAP) + barStart[h.bi];
@@ -2842,7 +2959,7 @@ $('keyForget').addEventListener('click', () => {
 // index.html is the user version: pick a song from the library, listen and sing. studio.html (or
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); EXAMPLE is used when it can't load.
-const STUDIO = /[?&]studio\b/.test(location.search);
+var STUDIO = /[?&]studio\b/.test(location.search);
 document.body.classList.toggle('studio', STUDIO);
 if (STUDIO) { document.title = 'Polyphony Studio'; $('appName').textContent = 'Polyphony studio'; }
 let library = [EXAMPLE];
