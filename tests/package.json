@@ -1,0 +1,12 @@
+{
+  "name": "polyphony-player-tests",
+  "private": true,
+  "description": "Checks for the polyphony player: pitch reading and singing-mode scoring.",
+  "scripts": {
+    "test": "node pitch-test.js && node sing-test.js",
+    "setup": "npx playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.0"
+  }
+}
