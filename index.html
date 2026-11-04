@@ -3043,7 +3043,7 @@ $('keyForget').addEventListener('click', () => {
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); EXAMPLE is used when it can't load.
 var STUDIO = /[?&]studio\b/.test(location.search);
-const BUILD = '4 Nov 2026, 20:45';   // shown in the header, to see which version a browser has
+const BUILD = '4 Nov 2026, 20:50';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
 $('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
 if (STUDIO) document.title = 'Polyphony Studio';
@@ -3074,15 +3074,43 @@ function chooseSong(i) {
 }
 $('songList').addEventListener('click', e => { const b = e.target.closest('.song'); if (b) chooseSong(+b.dataset.i); });
 async function loadLibrary() {
+  let found = false;
   try {
     const r = await fetch('songs.json', { cache: 'no-store' });
     const j = r.ok ? await r.json() : null;
-    if (j && Array.isArray(j.songs) && j.songs.length) library = j.songs.filter(x => x && Array.isArray(x.voices));
-  } catch (e) { /* opened as a file, or offline: only the built-in song */ }
-  const want = lsGet('pp.song'), i = library.findIndex(x => songKey(x) === want);
-  if (!STUDIO && i > 0) chooseSong(i);
-  else if (!STUDIO && library.length && songKey(library[0]) !== songKey(curRaw)) chooseSong(0);
+    if (j && Array.isArray(j.songs) && j.songs.length) { library = j.songs.filter(x => x && Array.isArray(x.voices)); found = true; }
+  } catch (e) { /* opened as a file: see below */ }
+  // opened from the folder (file://): the browser can't fetch songs.json, but the link the studio's Save
+  // made to it works here too (same page)
+  if (!found && !STUDIO && window.showOpenFilePicker) {
+    try {
+      const h = await songsFile(false);
+      if (h) { library = await readSongs(h); songsConnected = true; found = true; }
+      else if (songsHandle) userConnectButton();
+    } catch (e) { /* no link yet: only the built-in song */ }
+  }
+  if (!STUDIO && found && library.length) {
+    const want = lsGet('pp.song'), i = library.findIndex(x => songKey(x) === want);
+    chooseSong(i >= 0 ? i : 0);                   // also when the built-in song has the same title: the saved one is newer
+  }
   showLibrary();
+}
+// player opened from the folder, and the browser wants a click before it reads songs.json again
+function userConnectButton() {
+  if ($('userConnect')) return;
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'small'; b.id = 'userConnect';
+  b.textContent = 'Show saved songs';
+  b.addEventListener('click', async () => {
+    try {
+      const h = await songsFile(true);
+      if (!h) return;
+      library = await readSongs(h); songsConnected = true; b.remove();
+      const want = lsGet('pp.song'), i = library.findIndex(x => songKey(x) === want);
+      if (library.length) chooseSong(i >= 0 ? i : 0);
+      showLibrary();
+    } catch (e) { $('libMsg').className = 'msg bad'; $('libMsg').textContent = 'Couldn’t read songs.json: ' + (e && e.message || e); }
+  });
+  $('songList').after(b);
 }
 // studio: put the current song into songs.json (replacing a song with the same title) and download it;
 // put the file next to index.html, then commit and push to publish it
