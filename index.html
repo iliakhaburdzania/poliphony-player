@@ -3008,8 +3008,10 @@ $('keyForget').addEventListener('click', () => {
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); EXAMPLE is used when it can't load.
 var STUDIO = /[?&]studio\b/.test(location.search);
+const BUILD = '4 Nov 2026, 20:25';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
-if (STUDIO) { document.title = 'Polyphony Studio'; $('appName').textContent = 'Polyphony studio'; }
+$('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
+if (STUDIO) document.title = 'Polyphony Studio';
 let library = [EXAMPLE];
 function songKey(r) { return String(r && r.title || '').trim().toLowerCase(); }
 function showLibrary() {
