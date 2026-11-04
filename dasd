@@ -1,0 +1,36 @@
+[33mcommit efe8584edb2832a7df0763c2b4c438d43a78a530[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: Ilia <iliakhaburdzania@gmail.com>
+Date:   Wed Nov 4 14:04:07 2026 +0000
+
+    User version and studio; song library; Ceduri Mravaljamier as default
+    
+    index.html is now the user version (song list, listening, singing mode);
+    studio.html opens the full app (index.html?studio). Songs come from songs.json,
+    which the studio can update with "Add to song library".
+    
+    Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+    Claude-Session: https://claude.ai/code/session_01JzknGaZdd9Ra17q24hgMBC
+
+[33mcommit a5e19937f25679f0525eae5264aa0f8deb135e41[m
+Author: Ilia <iliakhaburdzania@gmail.com>
+Date:   Wed Nov 4 11:03:31 2026 +0000
+
+    Editing mode: sing to edit a part
+    
+    Record a part by singing it while the other voices play: "Fix pitches" keeps the
+    rhythm and sets each note to the sung pitch; "New notes" writes pitch and rhythm
+    on the grid. Count-in, live pitch line, octave matching, one undo step.
+    
+    Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+    Claude-Session: https://claude.ai/code/session_01JzknGaZdd9Ra17q24hgMBC
+
+[33mcommit ac09517e8955264c9d9bbc7ba18c38791a138fb0[m
+Author: Ilia <iliakhaburdzania@gmail.com>
+Date:   Wed Nov 4 10:37:37 2026 +0000
+
+    Polyphony Player: voice-by-voice playback, singing mode, editing mode and projects
+    
+    Single-file web app for practising Georgian polyphonic choral music.
+    
+    Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+    Claude-Session: https://claude.ai/code/session_01JzknGaZdd9Ra17q24hgMBC

@@ -140,6 +140,8 @@ body.studio .user-only { display: none !important; }
 .edtools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .edinfo { font-family: var(--font-mono); font-size: 12px; min-height: 1.4em; }
 #recBtn.rec { background: var(--bad); border-color: var(--bad); color: #fff; }
+.baredit { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding: 12px; border: 1px solid var(--accent); border-radius: 8px; background: var(--bg); }
+#beText { font: inherit; font-family: var(--font-mono); font-size: 14px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 100%; }
 #projName { font: inherit; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; flex: 1 1 200px; min-width: 0; }
 #projList { max-width: min(320px, 60vw); }
 .singhead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
@@ -355,13 +357,27 @@ body.studio .user-only { display: none !important; }
 
   <section class="panel roll" aria-label="Score view">
     <div class="rolltools">
-      <span class="note">Space plays and pauses. Click or drag on the score to move the playhead.</span>
+      <span class="note">Space plays and pauses. Click or drag on the score to move the playhead.<span class="studio-only"> Click a note to edit its bar.</span></span>
       <div class="seg" role="group" aria-label="Zoom">
         <button class="small" id="zOut" type="button" aria-label="Zoom out">&minus;</button>
         <button class="small" id="zIn" type="button" aria-label="Zoom in">+</button>
       </div>
     </div>
     <div class="rollwrap" id="rollwrap"><canvas id="roll" role="img" aria-label="Piano roll of the voices; click or drag to move the playhead"></canvas></div>
+    <div class="baredit studio-only" id="barEdit" hidden>
+      <div class="actions">
+        <b id="beLabel"></b>
+        <button class="small" type="button" id="bePrev" aria-label="Previous bar">&#9664;</button>
+        <button class="small" type="button" id="beNext" aria-label="Next bar">&#9654;</button>
+        <span class="note">NOTE:BEATS &middot; r = rest &middot; ~ = tie into the next bar &middot; + = stacked notes</span>
+      </div>
+      <input id="beText" type="text" spellcheck="false" autocomplete="off" aria-label="Bar text">
+      <div class="actions">
+        <button class="primary" type="button" id="beApply">Apply</button>
+        <button class="small" type="button" id="beCancel">Close</button>
+        <p class="msg" id="beMsg"></p>
+      </div>
+    </div>
     <div class="lyrics" id="lyrics"></div>
   </section>
 
@@ -591,6 +607,7 @@ function normalizePiece(raw) {
   if (raw.voices.length > 6) warns.push('Only the first 6 staves are used.');
   const transpose = Math.max(-12, Math.min(12, Math.round(Number(raw.transpose)) || 0));
   const src = raw.voices.slice(0, 6).map((v, vi) => ({
+    src: vi,
     name: String((v && v.name) || 'Part ' + (vi + 1)).slice(0, 30),
     shift: (Number(v && v.octaveShift) || 0) + transpose,
     bars: Array.isArray(v && v.bars) ? v.bars.map(String) : []
@@ -603,7 +620,7 @@ function normalizePiece(raw) {
     const k = Math.min(3, Math.max(1, ...bars.map(b => b ? Math.max(1, ...b.map(n => n.rest ? 1 : n.notes.length)) : 1)));
     for (let j = 0; j < k; j++) {
       parts.push({
-        name: k > 1 ? p.name + ' ' + (j + 1) : p.name, shift: p.shift,
+        src: p.src, name: k > 1 ? p.name + ' ' + (j + 1) : p.name, shift: p.shift,
         bars: bars.map(b => b && b.map(n => n.rest ? n : { rest: false, dur: n.dur, off: n.off, midi: n.notes[Math.min(j, n.notes.length - 1)], tie: n.tie }))
       });
     }
@@ -976,6 +993,13 @@ function draw() {
       for (let k = 0; k < 5; k++) { const y = Math.round(yb - k * SP) + 0.5; g.beginPath(); g.moveTo(G.x0, y); g.lineTo(G.x1, y); g.stroke(); }
       g.globalAlpha = 1;
     } else infos.push(null);
+  }
+  // the bar open in the bar editor, or picked in the transcription text
+  if (hiBar && !piece.audio && hiBar.bi < barStart.length) {
+    const x0 = X(barStart[hiBar.bi]), x1 = X(barStart[hiBar.bi] + lenOf(piece.voices[0].bars[hiBar.bi]));
+    g.fillStyle = cssVar('--accent'); g.globalAlpha = 0.14;
+    piece.voices.forEach((v, vi) => { if (v.src === hiBar.src) g.fillRect(x0, top + vi * (laneH + gap), x1 - x0, laneH); });
+    g.globalAlpha = 1;
   }
   // bar lines or time grid, with thinned labels
   g.strokeStyle = line; g.lineWidth = 1; g.fillStyle = muted; g.textAlign = 'left';
@@ -1760,12 +1784,13 @@ function showKey() {
 // rebuilds the piece from new score data and keeps position, playback, mutes and volumes
 function rebuildKeeping(raw) {
   const keepOn = state.on.slice(), vols = volEls.map(x => x.value), c = cursor, sl = wrap.scrollLeft, playing = !!session, pos = playing ? currentBeat() : 0;
-  buildPiece(raw);
+  const r = buildPiece(raw);
   curRaw = raw;
   $('json').value = JSON.stringify(raw, null, 1);
   if (keepOn.length === state.on.length) { state.on = keepOn; volEls.forEach((x, i) => { x.value = vols[i]; }); syncButtons(); }
   showPos(Math.min(c, totalBeats())); wrap.scrollLeft = sl;
   if (playing) startPlay(Math.min(pos, totalBeats()));
+  return r;
 }
 function setTranspose(T) {
   if (!piece || piece.audio || !curRaw) return;
@@ -1847,9 +1872,19 @@ function scrubEnd() {
 function inScrubZone(x, y) {        // editing mode: the bar-number strip, or within a few pixels of the playhead
   return y < rollGeo.top - 2 || Math.abs(x - geo().X(locate(cursor).within)) <= 6;
 }
-cv.addEventListener('pointerdown', e => { if (!piece || ed.on || e.button > 0) return; scrubStart(e); });
-cv.addEventListener('pointermove', e => { if (scrub) showPos(scrubPos(e)); });
-cv.addEventListener('pointerup', scrubEnd);
+cv.addEventListener('pointerdown', e => { if (!piece || ed.on || e.button > 0) return; scrubStart(e); scrub.x0 = e.clientX; scrub.y0 = e.clientY; scrub.moved = false; });
+cv.addEventListener('pointermove', e => { if (scrub) { if (Math.abs(e.clientX - (scrub.x0 || 0)) > 4) scrub.moved = true; showPos(scrubPos(e)); } });
+cv.addEventListener('pointerup', e => {
+  const clicked = scrub && scrub.x0 !== undefined && !scrub.moved;
+  scrubEnd();
+  if (clicked && STUDIO && !ed.on) { const h = rollNoteAt(e); if (h) barEditOpen(h.src, h.bi); }
+});
+// editing mode: double-click a note to open its bar in the bar editor
+cv.addEventListener('dblclick', e => {
+  if (!STUDIO || !ed.on || !ed.model) return;
+  const { x, y } = edPoint(e), hit = edHit(x, y);
+  if (hit && hit.n && piece.voices[hit.v]) barEditOpen(piece.voices[hit.v].src, edBarAt(edPlain(geo().B(x))));
+});
 cv.addEventListener('pointercancel', scrubEnd);
 $('lyrics').addEventListener('click', e => {
   const b = e.target.closest('button');
@@ -1861,6 +1896,121 @@ window.addEventListener('resize', () => draw());
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => draw()); } catch (e) { /* older browsers */ }
 new MutationObserver(() => draw()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => draw());
+
+/* ---------- bar editor and transcription links (studio) ---------- */
+// Click a note in the score to edit that bar's text for that part; click a bar in the Transcription box
+// to see it in the score. hiBar = { src: transcription voice index, bi: bar index } is highlighted.
+let hiBar = null, beAt = null;
+function rollNoteAt(e) {
+  const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  const { top, laneH, gap } = rollGeo, v = Math.floor((y - top) / (laneH + gap));
+  if (v < 0 || v >= nV || piece.audio) return null;
+  const G = geo();
+  let best = null, bd = 9;
+  events.forEach(ev => {
+    if (ev.v !== v) return;
+    const x0 = G.X(ev.start), x1 = G.X(ev.start + ev.dur);
+    if (x < x0 - 3 || x > Math.max(x1, x0 + 4) + 3) return;
+    const dy = Math.abs(y - laneYOf(v, ev.midi));
+    if (dy < bd) { bd = dy; best = ev; }
+  });
+  if (!best) return null;
+  const beat = G.B(x);
+  let bi = 0;
+  while (bi < barStart.length - 1 && barStart[bi + 1] <= beat) bi++;
+  return { src: piece.voices[v].src, bi };
+}
+// where bar bi of voice vi sits in the transcription text (JSON.stringify(raw, null, 1) layout or similar)
+function jsonBarRange(text, vi, bi) {
+  let at = -1;
+  for (let k = 0; k <= vi; k++) { at = text.indexOf('"bars"', at + 1); if (at < 0) return null; }
+  let i = text.indexOf('[', at);
+  for (let k = 0; ; k++) {
+    const a = text.indexOf('"', i + 1), close = text.indexOf(']', i + 1);
+    if (a < 0 || (close >= 0 && close < a)) return null;
+    const b = text.indexOf('"', a + 1);
+    if (b < 0) return null;
+    if (k === bi) return [a + 1, b];
+    i = b;
+  }
+}
+function showBarText(vi, bi) {
+  const ta = $('json'), r = jsonBarRange(ta.value, vi, bi);
+  if (!r || !$('editor').open) return;
+  ta.setSelectionRange(r[0], r[1]);
+  const lines = ta.value.slice(0, r[0]).split('\n').length, lh = parseFloat(getComputedStyle(ta).lineHeight) || 18;
+  ta.scrollTop = Math.max(0, (lines - 4) * lh);
+}
+function barEditOpen(vi, bi) {
+  if (!curRaw || !curRaw.voices[vi]) return;
+  bi = Math.max(0, Math.min(bi, (curRaw.voices[vi].bars || []).length - 1));
+  beAt = { vi, bi }; hiBar = { src: vi, bi };
+  $('beLabel').textContent = (curRaw.voices[vi].name || 'Part ' + (vi + 1)) + ' · bar ' + (bi + 1) + ' of ' + curRaw.voices[vi].bars.length;
+  $('beText').value = String(curRaw.voices[vi].bars[bi] == null ? '' : curRaw.voices[vi].bars[bi]);
+  $('beMsg').className = 'msg'; $('beMsg').textContent = '';
+  $('bePrev').disabled = bi <= 0; $('beNext').disabled = bi >= curRaw.voices[vi].bars.length - 1;
+  $('barEdit').hidden = false;
+  showBarText(vi, bi);
+  draw();
+  $('beText').focus(); $('beText').select();
+}
+function barEditClose() { $('barEdit').hidden = true; beAt = null; hiBar = null; draw(); }
+function barEditApply() {
+  if (!beAt || !curRaw) return;
+  const txt = $('beText').value.trim(), msg = $('beMsg');
+  if (!txt) { msg.className = 'msg bad'; msg.textContent = 'A bar needs at least one token, for example r:4 for a whole bar of rest.'; return; }
+  const raw = JSON.parse(JSON.stringify(curRaw));
+  raw.voices[beAt.vi].bars[beAt.bi] = txt;
+  const warns = [];
+  parseBarStr(txt, 'This bar', warns);
+  const before = ed.on && ed.model ? JSON.stringify(ed.model) : null;
+  let r;
+  try { r = rebuildKeeping(raw); } catch (e) { msg.className = 'msg bad'; msg.textContent = 'Could not apply: ' + (e && e.message || 'error'); return; }
+  if (ed.on) { edFromPiece(); if (before) { ed.undo.push(before); ed.redo = []; } edRanges(); edShowState(); }
+  ed.dirty = true; projShowState();
+  const len = lenOf(piece.voices[0].bars[beAt.bi]), mine = parseBarStr(txt, '', []).reduce((a, n) => a + n.dur, 0);
+  const note = Math.abs(mine - len) > 0.02 ? ' The bar is ' + (+mine.toFixed(3)) + ' beats here but ' + (+len.toFixed(3)) + ' in the longest part, so shorter parts get a rest.' : '';
+  msg.className = warns.length ? 'msg bad' : 'msg';
+  msg.textContent = (warns.length ? warns.join('; ') + '.' : 'Applied.') + note;
+  hiBar = { src: beAt.vi, bi: beAt.bi };
+  showBarText(beAt.vi, beAt.bi);
+  draw();
+}
+$('beApply').addEventListener('click', barEditApply);
+$('beCancel').addEventListener('click', barEditClose);
+$('bePrev').addEventListener('click', () => { if (beAt) barEditOpen(beAt.vi, beAt.bi - 1); });
+$('beNext').addEventListener('click', () => { if (beAt) barEditOpen(beAt.vi, beAt.bi + 1); });
+$('beText').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); barEditApply(); }
+  else if (e.key === 'Escape') { e.preventDefault(); barEditClose(); }
+});
+// the caret in the transcription text shows its bar in the score
+function jsonCaretBar() {
+  const ta = $('json'), pos = ta.selectionStart, t = ta.value;
+  const at = t.lastIndexOf('"bars"', pos);
+  if (at < 0) return null;
+  const open = t.indexOf('[', at), close = t.indexOf(']', open);
+  if (open < 0 || pos <= open || (close >= 0 && pos > close)) return null;
+  let vi = 0, k = -1;
+  while ((k = t.indexOf('"bars"', k + 1)) >= 0 && k < at) vi++;
+  const quotes = (t.slice(open, pos).match(/"/g) || []).length;
+  return { vi, bi: Math.floor(quotes / 2) };
+}
+function jsonShowBar() {
+  if (!piece || piece.audio) return;
+  const h = jsonCaretBar();
+  if (!h || h.bi >= barStart.length) { if (!beAt && hiBar) { hiBar = null; draw(); } return; }
+  hiBar = { src: h.vi, bi: h.bi };
+  if (!session) {
+    const c = locate(cursor).p * (PASS + GAP) + barStart[h.bi];
+    showPos(c);
+    const G = geo(), x = G.X(barStart[h.bi]);
+    if (x < wrap.scrollLeft + 20 || x > wrap.scrollLeft + wrap.clientWidth - 60) wrap.scrollLeft = Math.max(0, x - wrap.clientWidth * 0.25);
+  }
+  draw();
+}
+$('json').addEventListener('click', jsonShowBar);
+$('json').addEventListener('keyup', e => { if (/^(Arrow|Home|End|Page)/.test(e.key)) jsonShowBar(); });
 
 /* ---------- transcription editor ---------- */
 $('apply').addEventListener('click', () => {
