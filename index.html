@@ -317,8 +317,8 @@ body.studio .user-only { display: none !important; }
       </div>
       <p class="note edinfo" id="edInfo"></p>
       <p class="note">Sing to edit: select the notes to redo (or put the playhead where to start), choose the part and press Record. After a count-in the other voices play while you sing; headphones help. Fix pitches keeps the rhythm; New notes writes what you sang on the grid.</p>
-      <p class="note">Words: click a word above the notes to change it (Enter goes to the next one), drag it to move it, drag its right edge to make it longer or shorter, double-click empty space above a part's notes to add one. Shift-click or drag a box to select several; Ctrl+C copies them, click where they should go in another part and press Ctrl+V. With one word selected, ←/→ move it; Delete removes the selected words. Ctrl+Z / Ctrl+Y undo and redo notes and words alike. Save (Ctrl+S) keeps the song in songs.json.</p>
-      <p class="note">Drag a note to move it in time and pitch; drag its right end to change its length. Drag on empty space to select several notes, Shift-click to add one. Arrow keys move the selection (Shift+↑/↓ by an octave). Click empty space to move the playhead, or drag the playhead line or the bar numbers; Paste and Insert pause work there. A pause adds silence in all voices and moves the rest of the piece later; bars keep their length.</p>
+      <p class="note">Words: click a word above the notes to select it (Delete or Backspace removes it, ←/→ move it); click it again, or press Enter, to type its text (Enter then goes to the next one), drag it to move it, drag its right edge to make it longer or shorter, double-click empty space above a part's notes to add one. Shift-click or drag a box to select several; Ctrl+C copies them, click where they should go in another part and press Ctrl+V. A box dragged over notes and words selects both: Ctrl+C / Ctrl+X take them together and Ctrl+V puts them at the playhead, in the same parts; click another part first and Ctrl+V puts only the words there. With one word selected, ←/→ move it; Delete removes the selected words. Ctrl+Z / Ctrl+Y undo and redo notes and words alike. Save (Ctrl+S) keeps the song in songs.json.</p>
+      <p class="note">Drag a note to move it in time and pitch; drag its right end to change its length (made longer, it fills the rest after it; the next notes move later only when it reaches them). Where two notes touch, dragging right at the crossing moves the crossing and all later notes of the part follow, earlier or later: a line with arrows and outlines on those notes show it while you point there. Just left of the crossing only that note changes. Drag on empty space to select several notes, Shift-click to add one. Arrow keys move the selection (Shift+↑/↓ by an octave). Click empty space to move the playhead, or drag the playhead line or the bar numbers; Paste and Insert pause work there. A pause adds silence in all voices and moves the rest of the piece later; bars keep their length.</p>
       <div class="actions" hidden>
         <input id="projName" type="text" placeholder="Project name" aria-label="Project name" maxlength="80">
         <button class="primary" type="button" id="projSave">Save project</button>
@@ -405,35 +405,36 @@ body.studio .user-only { display: none !important; }
 const EXAMPLE = {
  "title": "Ceduri Mravaljamier",
  "subtitle": "Many Years (Georgian) · ცედური მრავალჟამიერ · Traditional",
- "tempo": 160,
+ "tempo": 70,
  "repeatTimes": 1,
  "transpose": -2,
  "breathAfter": [],
  "fermataBars": [],
  "lyrics": [
   "",
-  "Mra-",
-  "val-",
-  "ja-mi-er,",
-  "Mra-",
-  "val-",
-  "ja-mi-er,",
-  "Mra-",
-  "val-",
-  "ja-mi-er,",
-  "Mra-",
-  "val,",
-  "Mra-",
-  "val-ja-",
-  "mi, ja-mi-",
-  "er",
-  "ja-mi-",
-  "er,",
-  "Mra-",
-  "val,",
-  "Mra-val-",
-  "ja-mi,",
-  "ja-mi-er!",
+  "ა-ა-",
+  "ვალ",
+  "ჟა-ა-მი-",
+  "ერ მრა-",
+  "ა-ა-ვალ",
+  "ჟა-",
+  "ა-მი-ე-",
+  "ერ მრა-",
+  "ა-ა-ვალ",
+  "ჟა-მი-ე-",
+  "ერ მრა-",
+  "ა-ა-ვალ",
+  "მრა-",
+  "ვალ-ჟა-",
+  "ა-მი-ჟა-მი-ე-",
+  "ე-ერ",
+  "ჟა-მი-ე-",
+  "ერ მრა-",
+  "ა-ა-ვალ",
+  "მრა-",
+  "ვალ-ჟა-",
+  "ა-მი-ჟა-მი-ე-",
+  "ე-ერ",
   "",
   ""
  ],
@@ -445,209 +446,310 @@ const EXAMPLE = {
     "r:4",
     "E5:2 C5:1 D5:1",
     "E5:4",
-    "E5:1 F5:1 F5:1 E5:1~",
-    "E5:1 D5:2 B4:1",
-    "C5:1 D5:3~",
-    "D5:1 D5:1 E5:1 E5:1",
-    "D5:1 E5:2 E5:1~",
-    "E5:3 F5:1~",
-    "F5:2 F5:0.75 F5:0.25 F5:1~",
-    "F5:0.5 G5:0.25 F5:0.25 E5:2 E5:1~",
-    "E5:1 F5:1 E5:1 D5:1~",
-    "D5:3 D5:1~",
-    "D5:1 E5:2 F5:1~",
-    "F5:2 F5:1 E5:0.75 E5:0.25",
+    "E5:2 F5:1 F5:1",
+    "E5:2 D5:2",
+    "B4:1 C5:1 D5:2~",
+    "D5:2 D5:2",
+    "E5:1 E5:1 D5:2",
+    "E5:2 E5:2~",
+    "E5:2 F5:2~",
+    "F5:1 F5:0.75 F5:0.25 F5:2",
     "E5:2 E5:2",
-    "F5:3 F5:0.75 F5:0.25",
-    "F5:1.5 G5:0.25 F5:0.25 E5:2",
-    "E5:2 F5:1 E5:1",
-    "D5:4",
-    "D5:2 E5:2",
-    "F5:3 F5:1",
-    "E5:0.75 E5:0.25 E5:3~",
-    "E5:2.5 r:1.5",
-    "r:2"
+    "F5:1 E5:1 D5:2~",
+    "D5:2 D5:2",
+    "E5:2 F5:2~",
+    "F5:1 F5:1 E5:0.75 E5:0.25 E5:1~",
+    "E5:1 E5:1 F5:2~",
+    "F5:1 F5:0.75 F5:0.25 F5:2",
+    "E5:2 E5:2",
+    "F5:1 E5:1 D5:2~",
+    "D5:2 D5:2",
+    "E5:2 F5:2~",
+    "F5:1 F5:1 E5:0.75 E5:0.25 E5:1~",
+    "E5:4~",
+    "E5:2",
+    "r:4"
    ],
    "lyricsTimed": [
     {
-     "t": 4,
-     "d": 4,
-     "text": "Mra-"
+     "t": 6,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 7,
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 8,
      "d": 4,
-     "text": "val-"
+     "text": "ვალ"
     },
     {
      "t": 12,
-     "d": 1,
-     "text": "ja-"
-    },
-    {
-     "t": 13,
-     "d": 1,
-     "text": "mi-"
+     "d": 2,
+     "text": "ჟა-"
     },
     {
      "t": 14,
-     "d": 2,
-     "text": "er,"
+     "d": 1,
+     "text": "ა-"
     },
     {
-     "t": 17,
-     "d": 4,
-     "text": "Mra-"
+     "t": 15,
+     "d": 1,
+     "text": "მი-"
+    },
+    {
+     "t": 16,
+     "d": 2,
+     "text": "ერ"
+    },
+    {
+     "t": 18,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 20,
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 21,
-     "d": 4,
-     "text": "val-"
+     "d": 1,
+     "text": "ა-"
     },
     {
-     "t": 25,
-     "d": 1,
-     "text": "ja-"
+     "t": 22,
+     "d": 4,
+     "text": "ვალ"
     },
     {
      "t": 26,
+     "d": 2,
+     "text": "ჟა-"
+    },
+    {
+     "t": 28,
      "d": 1,
-     "text": "mi-"
+     "text": "ა-"
     },
     {
-     "t": 27,
-     "d": 3,
-     "text": "er,"
+     "t": 29,
+     "d": 1,
+     "text": "მი-"
     },
     {
-     "t": 31,
-     "d": 4,
-     "text": "Mra-"
+     "t": 30,
+     "d": 2,
+     "text": "ე-"
     },
     {
-     "t": 35,
-     "d": 3,
-     "text": "val-"
+     "t": 32,
+     "d": 2,
+     "text": "ერ"
+    },
+    {
+     "t": 34,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 36,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 37,
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 38,
-     "d": 0.75,
-     "text": "ja-"
-    },
-    {
-     "t": 38.75,
-     "d": 0.25,
-     "text": "mi-"
-    },
-    {
-     "t": 39,
-     "d": 4,
-     "text": "er,"
-    },
-    {
-     "t": 43,
-     "d": 4,
-     "text": "Mra-"
-    },
-    {
-     "t": 47,
-     "d": 4,
-     "text": "val,"
-    },
-    {
-     "t": 51,
-     "d": 2,
-     "text": "Mra-"
-    },
-    {
-     "t": 53,
-     "d": 2,
-     "text": "val-"
-    },
-    {
-     "t": 55,
      "d": 3,
-     "text": "ja-"
+     "text": "ვალ"
+    },
+    {
+     "t": 41,
+     "d": 0.75,
+     "text": "ჟა-"
+    },
+    {
+     "t": 41.75,
+     "d": 0.25,
+     "text": "მი-"
+    },
+    {
+     "t": 42,
+     "d": 2,
+     "text": "ე-"
+    },
+    {
+     "t": 44,
+     "d": 2,
+     "text": "ერ"
+    },
+    {
+     "t": 46,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 48,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 49,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 50,
+     "d": 4,
+     "text": "ვალ"
+    },
+    {
+     "t": 54,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 56,
+     "d": 2,
+     "text": "ვალ-"
     },
     {
      "t": 58,
-     "d": 1,
-     "text": "mi,"
-    },
-    {
-     "t": 59,
-     "d": 0.75,
-     "text": "ja-"
-    },
-    {
-     "t": 59.75,
-     "d": 0.25,
-     "text": "mi-"
+     "d": 2,
+     "text": "ჟა-"
     },
     {
      "t": 60,
-     "d": 4,
-     "text": "er"
-    },
-    {
-     "t": 64,
-     "d": 3,
-     "text": "ja-"
-    },
-    {
-     "t": 67,
      "d": 1,
-     "text": "mi-"
+     "text": "ა-"
     },
     {
-     "t": 68,
-     "d": 4,
-     "text": "er,"
+     "t": 61,
+     "d": 1,
+     "text": "მი-"
+    },
+    {
+     "t": 62,
+     "d": 0.75,
+     "text": "ჟა-"
+    },
+    {
+     "t": 62.75,
+     "d": 0.25,
+     "text": "მი-"
+    },
+    {
+     "t": 63,
+     "d": 2,
+     "text": "ე-"
+    },
+    {
+     "t": 65,
+     "d": 1,
+     "text": "ე-"
+    },
+    {
+     "t": 66,
+     "d": 3,
+     "text": "ერ"
+    },
+    {
+     "t": 69,
+     "d": 0.5,
+     "text": "ჟა-"
+    },
+    {
+     "t": 69.5,
+     "d": 0.5,
+     "text": "მი-"
+    },
+    {
+     "t": 70,
+     "d": 2,
+     "text": "ე-"
     },
     {
      "t": 72,
-     "d": 4,
-     "text": "Mra-"
+     "d": 2,
+     "text": "ერ"
+    },
+    {
+     "t": 74,
+     "d": 2,
+     "text": "მრა-"
     },
     {
      "t": 76,
-     "d": 4,
-     "text": "val,"
+     "d": 1,
+     "text": "ა-"
     },
     {
-     "t": 80,
-     "d": 2,
-     "text": "Mra-"
+     "t": 77,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 78,
+     "d": 4,
+     "text": "ვალ"
     },
     {
      "t": 82,
      "d": 2,
-     "text": "val-"
+     "text": "მრა-"
     },
     {
      "t": 84,
-     "d": 3,
-     "text": "ja-"
+     "d": 2,
+     "text": "ვალ-"
     },
     {
-     "t": 87,
-     "d": 1,
-     "text": "mi,"
+     "t": 86,
+     "d": 2,
+     "text": "ჟა-"
     },
     {
      "t": 88,
-     "d": 0.75,
-     "text": "ja-"
-    },
-    {
-     "t": 88.75,
-     "d": 0.25,
-     "text": "mi-"
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 89,
-     "d": 5.5,
-     "text": "er!"
+     "d": 1,
+     "text": "მი-"
+    },
+    {
+     "t": 90,
+     "d": 0.75,
+     "text": "ჟა-"
+    },
+    {
+     "t": 90.75,
+     "d": 0.25,
+     "text": "მი-"
+    },
+    {
+     "t": 91,
+     "d": 1.5,
+     "text": "ე-"
+    },
+    {
+     "t": 92.5,
+     "d": 1.5,
+     "text": "ე-"
+    },
+    {
+     "t": 94,
+     "d": 4,
+     "text": "ერ"
     }
    ]
   },
@@ -658,28 +760,29 @@ const EXAMPLE = {
     "G4:4~",
     "G4:2 E4:1 F4:1",
     "G4:4",
-    "G4:1 A4:1 A4:1 G4:1~",
-    "G4:1 F4:2 D4:1",
-    "E4:1 F4:3~",
-    "F4:1 F4:1 G4:1 G4:1",
-    "F4:1 G4:2 G4:1~",
-    "G4:1 C5:1 B4:1 A4:1~",
-    "A4:2 B4:0.75 C5:0.25 D5:1~",
-    "D5:0.5 E5:0.25 D5:0.25 C5:2 C5:1~",
-    "C5:1 D5:1 C5:1 B4:1~",
-    "B4:3 B4:1~",
-    "B4:1 C5:2 D5:1~",
-    "D5:1 A4:1 B4:1 C5:0.75 C5:0.25",
-    "C5:2 G4:0.667 C5:0.667 B4:0.666",
-    "A4:3 B4:0.75 C5:0.25",
-    "D5:1.5 E5:0.25 D5:0.25 C5:2",
-    "C5:2 D5:1 C5:1",
-    "B4:4",
-    "B4:2 C5:2",
-    "D5:2 A4:1 B4:1",
-    "C5:0.75 C5:0.25 C5:1.5 A4:1.5",
-    "G4:2.5 r:1.5",
-    "r:2"
+    "G4:2 A4:1 A4:1",
+    "G4:2 F4:2",
+    "D4:1 E4:1 F4:2~",
+    "F4:2 F4:2",
+    "G4:1 G4:1 F4:2",
+    "G4:2 G4:2",
+    "C5:1 B4:1 A4:2~",
+    "A4:1 B4:0.75 C5:0.25 D5:2",
+    "C5:2 C5:2",
+    "D5:1 C5:1 B4:2~",
+    "B4:2 B4:2",
+    "C5:2 D5:2",
+    "A4:1 B4:1 C5:0.75 C5:0.25 C5:1~",
+    "C5:1 B4:1 A4:2~",
+    "A4:1 B4:0.75 C5:0.25 D5:2",
+    "C5:2 C5:2",
+    "D5:1 C5:1 B4:2~",
+    "B4:2 B4:2",
+    "C5:2 D5:2",
+    "A4:1 B4:1 C5:0.75 C5:0.25 C5:1~",
+    "C5:0.5 A4:1.5 G4:2~",
+    "G4:2",
+    "r:4"
    ],
    "lyricsTimed": [
     {
@@ -693,179 +796,279 @@ const EXAMPLE = {
      "text": "ა-"
     },
     {
+     "t": 7,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
      "t": 8,
      "d": 4,
-     "text": "val-"
+     "text": "ვალ"
     },
     {
      "t": 12,
-     "d": 1,
-     "text": "ja-"
-    },
-    {
-     "t": 13,
-     "d": 1,
-     "text": "mi-"
+     "d": 2,
+     "text": "ჟა-"
     },
     {
      "t": 14,
-     "d": 2,
-     "text": "er,"
+     "d": 1,
+     "text": "ა-"
     },
     {
-     "t": 17,
-     "d": 4,
-     "text": "Mra-"
+     "t": 15,
+     "d": 1,
+     "text": "მი-"
+    },
+    {
+     "t": 16,
+     "d": 2,
+     "text": "ერ"
+    },
+    {
+     "t": 18,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 20,
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 21,
-     "d": 4,
-     "text": "val-"
+     "d": 1,
+     "text": "ა-"
     },
     {
-     "t": 25,
-     "d": 1,
-     "text": "ja-"
+     "t": 22,
+     "d": 4,
+     "text": "ვალ"
     },
     {
      "t": 26,
+     "d": 2,
+     "text": "ჟა-"
+    },
+    {
+     "t": 28,
      "d": 1,
-     "text": "mi-"
+     "text": "ა-"
     },
     {
-     "t": 27,
-     "d": 3,
-     "text": "er,"
+     "t": 29,
+     "d": 1,
+     "text": "მი-"
     },
     {
-     "t": 31,
-     "d": 4,
-     "text": "Mra-"
+     "t": 30,
+     "d": 2,
+     "text": "ე-"
     },
     {
-     "t": 35,
-     "d": 3,
-     "text": "val-"
+     "t": 32,
+     "d": 2,
+     "text": "ერ"
+    },
+    {
+     "t": 34,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 36,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 37,
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 38,
+     "d": 3,
+     "text": "ვალ"
+    },
+    {
+     "t": 41,
      "d": 0.75,
-     "text": "ja-"
+     "text": "ჟა-"
     },
     {
-     "t": 38.75,
+     "t": 41.75,
      "d": 0.25,
-     "text": "mi-"
+     "text": "მი-"
     },
     {
-     "t": 39,
+     "t": 42,
+     "d": 2,
+     "text": "ე-"
+    },
+    {
+     "t": 44,
+     "d": 2,
+     "text": "ერ"
+    },
+    {
+     "t": 46,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 48,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 49,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 50,
      "d": 4,
-     "text": "er,"
+     "text": "ვალ"
     },
     {
-     "t": 43,
-     "d": 4,
-     "text": "Mra-"
-    },
-    {
-     "t": 47,
-     "d": 4,
-     "text": "val,"
-    },
-    {
-     "t": 51,
+     "t": 54,
      "d": 2,
-     "text": "Mra-"
+     "text": "მრა-"
     },
     {
-     "t": 53,
+     "t": 56,
      "d": 2,
-     "text": "val-"
+     "text": "ვალ-"
     },
     {
-     "t": 55,
+     "t": 58,
      "d": 2,
-     "text": "ja-"
-    },
-    {
-     "t": 57,
-     "d": 2,
-     "text": "mi,"
-    },
-    {
-     "t": 59,
-     "d": 0.75,
-     "text": "ja-"
-    },
-    {
-     "t": 59.75,
-     "d": 0.25,
-     "text": "mi-"
+     "text": "ჟა-"
     },
     {
      "t": 60,
-     "d": 4,
-     "text": "er"
-    },
-    {
-     "t": 64,
-     "d": 3,
-     "text": "ja-"
-    },
-    {
-     "t": 67,
      "d": 1,
-     "text": "mi-"
+     "text": "ა-"
     },
     {
-     "t": 68,
-     "d": 4,
-     "text": "er,"
+     "t": 61,
+     "d": 1,
+     "text": "მი-"
+    },
+    {
+     "t": 62,
+     "d": 0.75,
+     "text": "ჟა-"
+    },
+    {
+     "t": 62.75,
+     "d": 0.25,
+     "text": "მი-"
+    },
+    {
+     "t": 63,
+     "d": 2,
+     "text": "ე-"
+    },
+    {
+     "t": 65,
+     "d": 1,
+     "text": "ე-"
+    },
+    {
+     "t": 66,
+     "d": 3,
+     "text": "ერ"
+    },
+    {
+     "t": 69,
+     "d": 0.5,
+     "text": "ჟა-"
+    },
+    {
+     "t": 69.5,
+     "d": 0.5,
+     "text": "მი-"
+    },
+    {
+     "t": 70,
+     "d": 2,
+     "text": "ე-"
     },
     {
      "t": 72,
-     "d": 4,
-     "text": "Mra-"
+     "d": 2,
+     "text": "ერ"
+    },
+    {
+     "t": 74,
+     "d": 2,
+     "text": "მრა-"
     },
     {
      "t": 76,
-     "d": 4,
-     "text": "val,"
+     "d": 1,
+     "text": "ა-"
     },
     {
-     "t": 80,
-     "d": 2,
-     "text": "Mra-"
+     "t": 77,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 78,
+     "d": 4,
+     "text": "ვალ"
     },
     {
      "t": 82,
      "d": 2,
-     "text": "val-"
+     "text": "მრა-"
     },
     {
      "t": 84,
      "d": 2,
-     "text": "ja-"
+     "text": "ვალ-"
     },
     {
      "t": 86,
      "d": 2,
-     "text": "mi,"
+     "text": "ჟა-"
     },
     {
      "t": 88,
-     "d": 0.75,
-     "text": "ja-"
-    },
-    {
-     "t": 88.75,
-     "d": 0.25,
-     "text": "mi-"
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 89,
-     "d": 5.5,
-     "text": "er!"
+     "d": 1,
+     "text": "მი-"
+    },
+    {
+     "t": 90,
+     "d": 0.75,
+     "text": "ჟა-"
+    },
+    {
+     "t": 90.75,
+     "d": 0.25,
+     "text": "მი-"
+    },
+    {
+     "t": 91,
+     "d": 1.5,
+     "text": "ე-"
+    },
+    {
+     "t": 92.5,
+     "d": 1.5,
+     "text": "ე-"
+    },
+    {
+     "t": 94,
+     "d": 4,
+     "text": "ერ"
     }
    ]
   },
@@ -876,209 +1079,310 @@ const EXAMPLE = {
     "r:4",
     "C3:4",
     "C3:4",
-    "C3:2 C3:1 C3:1~",
-    "C3:1 G3:3~",
-    "G3:1 G3:3~",
-    "G3:1 G3:2 G3:1",
-    "G3:1 G3:2 C3:1~",
-    "C3:3 F3:1~",
-    "F3:2 F3:0.75 F3:0.25 G3:1~",
-    "G3:3 G3:1~",
-    "G3:3 G3:1~",
-    "G3:3 G3:1~",
-    "G3:1 G3:2 G3:1~",
-    "G3:2 G3:1 C3:0.75 C3:0.25",
-    "C3:2 C3:2",
-    "F3:3 F3:0.75 F3:0.25",
-    "G3:4",
-    "G3:4",
-    "G3:4",
+    "C3:3 C3:1",
+    "C3:2 G3:2~",
+    "G3:2 G3:2~",
     "G3:2 G3:2",
-    "G3:3 G3:1",
-    "C3:0.75 C3:0.25 C3:3~",
-    "C3:2.5 r:1.5",
-    "r:2"
+    "G3:1 G3:1 G3:2",
+    "C3:4~",
+    "C3:2 F3:2~",
+    "F3:1 F3:0.75 F3:0.25 G3:2~",
+    "G3:2 G3:2~",
+    "G3:2 G3:2~",
+    "G3:2 G3:2",
+    "G3:2 G3:2~",
+    "G3:1 G3:1 C3:0.75 C3:0.25 C3:1~",
+    "C3:1 C3:1 F3:2~",
+    "F3:1 F3:0.75 F3:0.25 G3:2~",
+    "G3:2 G3:2~",
+    "G3:2 G3:2~",
+    "G3:2 G3:2",
+    "G3:2 G3:2~",
+    "G3:1 G3:1 C3:0.75 C3:0.25 C3:1~",
+    "C3:4~",
+    "C3:2",
+    "r:4"
    ],
    "lyricsTimed": [
     {
-     "t": 4,
-     "d": 4,
-     "text": "Mra-"
+     "t": 6,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 7,
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 8,
      "d": 4,
-     "text": "val-"
+     "text": "ვალ"
     },
     {
      "t": 12,
      "d": 2,
-     "text": "ja-"
+     "text": "ჟა-"
     },
     {
      "t": 14,
      "d": 1,
-     "text": "mi-"
+     "text": "ა-"
     },
     {
      "t": 15,
      "d": 1,
-     "text": "er,"
+     "text": "მი-"
     },
     {
-     "t": 17,
-     "d": 4,
-     "text": "Mra-"
+     "t": 16,
+     "d": 2,
+     "text": "ერ"
+    },
+    {
+     "t": 18,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 20,
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 21,
-     "d": 4,
-     "text": "val-"
-    },
-    {
-     "t": 25,
-     "d": 2,
-     "text": "ja-"
-    },
-    {
-     "t": 27,
      "d": 1,
-     "text": "mi-"
+     "text": "ა-"
+    },
+    {
+     "t": 22,
+     "d": 4,
+     "text": "ვალ"
+    },
+    {
+     "t": 26,
+     "d": 2,
+     "text": "ჟა-"
     },
     {
      "t": 28,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 29,
+     "d": 1,
+     "text": "მი-"
+    },
+    {
+     "t": 30,
      "d": 2,
-     "text": "er,"
+     "text": "ე-"
     },
     {
-     "t": 31,
-     "d": 4,
-     "text": "Mra-"
+     "t": 32,
+     "d": 2,
+     "text": "ერ"
     },
     {
-     "t": 35,
-     "d": 3,
-     "text": "val-"
+     "t": 34,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 36,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 37,
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 38,
-     "d": 0.75,
-     "text": "ja-"
-    },
-    {
-     "t": 38.75,
-     "d": 0.25,
-     "text": "mi-"
-    },
-    {
-     "t": 39,
-     "d": 4,
-     "text": "er,"
-    },
-    {
-     "t": 43,
-     "d": 4,
-     "text": "Mra-"
-    },
-    {
-     "t": 47,
-     "d": 4,
-     "text": "val,"
-    },
-    {
-     "t": 51,
-     "d": 2,
-     "text": "Mra-"
-    },
-    {
-     "t": 53,
-     "d": 2,
-     "text": "val-"
-    },
-    {
-     "t": 55,
      "d": 3,
-     "text": "ja-"
+     "text": "ვალ"
+    },
+    {
+     "t": 41,
+     "d": 0.75,
+     "text": "ჟა-"
+    },
+    {
+     "t": 41.75,
+     "d": 0.25,
+     "text": "მი-"
+    },
+    {
+     "t": 42,
+     "d": 2,
+     "text": "ე-"
+    },
+    {
+     "t": 44,
+     "d": 2,
+     "text": "ერ"
+    },
+    {
+     "t": 46,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 48,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 49,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 50,
+     "d": 4,
+     "text": "ვალ"
+    },
+    {
+     "t": 54,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 56,
+     "d": 2,
+     "text": "ვალ-"
     },
     {
      "t": 58,
-     "d": 1,
-     "text": "mi,"
-    },
-    {
-     "t": 59,
-     "d": 0.75,
-     "text": "ja-"
-    },
-    {
-     "t": 59.75,
-     "d": 0.25,
-     "text": "mi-"
+     "d": 2,
+     "text": "ჟა-"
     },
     {
      "t": 60,
-     "d": 4,
-     "text": "er"
-    },
-    {
-     "t": 64,
-     "d": 3,
-     "text": "ja-"
-    },
-    {
-     "t": 67,
      "d": 1,
-     "text": "mi-"
+     "text": "ა-"
     },
     {
-     "t": 68,
-     "d": 4,
-     "text": "er,"
+     "t": 61,
+     "d": 1,
+     "text": "მი-"
+    },
+    {
+     "t": 62,
+     "d": 0.75,
+     "text": "ჟა-"
+    },
+    {
+     "t": 62.75,
+     "d": 0.25,
+     "text": "მი-"
+    },
+    {
+     "t": 63,
+     "d": 2,
+     "text": "ე-"
+    },
+    {
+     "t": 65,
+     "d": 1,
+     "text": "ე-"
+    },
+    {
+     "t": 66,
+     "d": 3,
+     "text": "ერ"
+    },
+    {
+     "t": 69,
+     "d": 0.5,
+     "text": "ჟა-"
+    },
+    {
+     "t": 69.5,
+     "d": 0.5,
+     "text": "მი-"
+    },
+    {
+     "t": 70,
+     "d": 2,
+     "text": "ე-"
     },
     {
      "t": 72,
-     "d": 4,
-     "text": "Mra-"
+     "d": 2,
+     "text": "ერ"
+    },
+    {
+     "t": 74,
+     "d": 2,
+     "text": "მრა-"
     },
     {
      "t": 76,
-     "d": 4,
-     "text": "val,"
+     "d": 1,
+     "text": "ა-"
     },
     {
-     "t": 80,
-     "d": 2,
-     "text": "Mra-"
+     "t": 77,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 78,
+     "d": 4,
+     "text": "ვალ"
     },
     {
      "t": 82,
      "d": 2,
-     "text": "val-"
+     "text": "მრა-"
     },
     {
      "t": 84,
-     "d": 3,
-     "text": "ja-"
+     "d": 2,
+     "text": "ვალ-"
     },
     {
-     "t": 87,
-     "d": 1,
-     "text": "mi,"
+     "t": 86,
+     "d": 2,
+     "text": "ჟა-"
     },
     {
      "t": 88,
-     "d": 0.75,
-     "text": "ja-"
-    },
-    {
-     "t": 88.75,
-     "d": 0.25,
-     "text": "mi-"
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 89,
-     "d": 5.5,
-     "text": "er!"
+     "d": 1,
+     "text": "მი-"
+    },
+    {
+     "t": 90,
+     "d": 0.75,
+     "text": "ჟა-"
+    },
+    {
+     "t": 90.75,
+     "d": 0.25,
+     "text": "მი-"
+    },
+    {
+     "t": 91,
+     "d": 1.5,
+     "text": "ე-"
+    },
+    {
+     "t": 92.5,
+     "d": 1.5,
+     "text": "ე-"
+    },
+    {
+     "t": 94,
+     "d": 4,
+     "text": "ერ"
     }
    ]
   },
@@ -1089,209 +1393,310 @@ const EXAMPLE = {
     "r:4",
     "C3:4",
     "C3:4",
-    "C3:2 C3:1 C3:1~",
-    "C3:1 G2:3~",
-    "G2:1 G2:3~",
-    "G2:1 G2:2 G2:1",
-    "G2:1 G2:2 C3:1~",
-    "C3:3 F3:1~",
-    "F3:2 F3:0.75 F3:0.25 G3:1~",
-    "G3:3 G3:1~",
-    "G3:3 G3:1~",
-    "G3:3 G3:1~",
-    "G3:1 G3:2 G3:1~",
-    "G3:2 G3:1 C3:0.75 C3:0.25",
-    "C3:2 C3:2",
-    "F3:3 F3:0.75 F3:0.25",
-    "G3:4",
-    "G3:4",
-    "G3:4",
+    "C3:3 C3:1",
+    "C3:2 G2:2~",
+    "G2:2 G2:2~",
+    "G2:2 G2:2",
+    "G2:1 G2:1 G2:2",
+    "C3:4~",
+    "C3:2 F3:2~",
+    "F3:1 F3:0.75 F3:0.25 G3:2~",
+    "G3:2 G3:2~",
+    "G3:2 G3:2~",
     "G3:2 G3:2",
-    "G3:3 G3:1",
-    "C3:0.75 C3:0.25 C3:3~",
-    "C3:2.5 r:1.5",
-    "r:2"
+    "G3:2 G3:2~",
+    "G3:1 G3:1 C3:0.75 C3:0.25 C3:1~",
+    "C3:1 C3:1 F3:2~",
+    "F3:1 F3:0.75 F3:0.25 G3:2~",
+    "G3:2 G3:2~",
+    "G3:2 G3:2~",
+    "G3:2 G3:2",
+    "G3:2 G3:2~",
+    "G3:1 G3:1 C3:0.75 C3:0.25 C3:1~",
+    "C3:4~",
+    "C3:2",
+    "r:4"
    ],
    "lyricsTimed": [
     {
-     "t": 4,
-     "d": 4,
-     "text": "Mra-"
+     "t": 6,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 7,
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 8,
      "d": 4,
-     "text": "val-"
+     "text": "ვალ"
     },
     {
      "t": 12,
      "d": 2,
-     "text": "ja-"
+     "text": "ჟა-"
     },
     {
      "t": 14,
      "d": 1,
-     "text": "mi-"
+     "text": "ა-"
     },
     {
      "t": 15,
      "d": 1,
-     "text": "er,"
+     "text": "მი-"
     },
     {
-     "t": 17,
-     "d": 4,
-     "text": "Mra-"
+     "t": 16,
+     "d": 2,
+     "text": "ერ"
+    },
+    {
+     "t": 18,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 20,
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 21,
-     "d": 4,
-     "text": "val-"
-    },
-    {
-     "t": 25,
-     "d": 2,
-     "text": "ja-"
-    },
-    {
-     "t": 27,
      "d": 1,
-     "text": "mi-"
+     "text": "ა-"
+    },
+    {
+     "t": 22,
+     "d": 4,
+     "text": "ვალ"
+    },
+    {
+     "t": 26,
+     "d": 2,
+     "text": "ჟა-"
     },
     {
      "t": 28,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 29,
+     "d": 1,
+     "text": "მი-"
+    },
+    {
+     "t": 30,
      "d": 2,
-     "text": "er,"
+     "text": "ე-"
     },
     {
-     "t": 31,
-     "d": 4,
-     "text": "Mra-"
+     "t": 32,
+     "d": 2,
+     "text": "ერ"
     },
     {
-     "t": 35,
-     "d": 3,
-     "text": "val-"
+     "t": 34,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 36,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 37,
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 38,
-     "d": 0.75,
-     "text": "ja-"
-    },
-    {
-     "t": 38.75,
-     "d": 0.25,
-     "text": "mi-"
-    },
-    {
-     "t": 39,
-     "d": 4,
-     "text": "er,"
-    },
-    {
-     "t": 43,
-     "d": 4,
-     "text": "Mra-"
-    },
-    {
-     "t": 47,
-     "d": 4,
-     "text": "val,"
-    },
-    {
-     "t": 51,
-     "d": 2,
-     "text": "Mra-"
-    },
-    {
-     "t": 53,
-     "d": 2,
-     "text": "val-"
-    },
-    {
-     "t": 55,
      "d": 3,
-     "text": "ja-"
+     "text": "ვალ"
+    },
+    {
+     "t": 41,
+     "d": 0.75,
+     "text": "ჟა-"
+    },
+    {
+     "t": 41.75,
+     "d": 0.25,
+     "text": "მი-"
+    },
+    {
+     "t": 42,
+     "d": 2,
+     "text": "ე-"
+    },
+    {
+     "t": 44,
+     "d": 2,
+     "text": "ერ"
+    },
+    {
+     "t": 46,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 48,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 49,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 50,
+     "d": 4,
+     "text": "ვალ"
+    },
+    {
+     "t": 54,
+     "d": 2,
+     "text": "მრა-"
+    },
+    {
+     "t": 56,
+     "d": 2,
+     "text": "ვალ-"
     },
     {
      "t": 58,
-     "d": 1,
-     "text": "mi,"
-    },
-    {
-     "t": 59,
-     "d": 0.75,
-     "text": "ja-"
-    },
-    {
-     "t": 59.75,
-     "d": 0.25,
-     "text": "mi-"
+     "d": 2,
+     "text": "ჟა-"
     },
     {
      "t": 60,
-     "d": 4,
-     "text": "er"
-    },
-    {
-     "t": 64,
-     "d": 3,
-     "text": "ja-"
-    },
-    {
-     "t": 67,
      "d": 1,
-     "text": "mi-"
+     "text": "ა-"
     },
     {
-     "t": 68,
-     "d": 4,
-     "text": "er,"
+     "t": 61,
+     "d": 1,
+     "text": "მი-"
+    },
+    {
+     "t": 62,
+     "d": 0.75,
+     "text": "ჟა-"
+    },
+    {
+     "t": 62.75,
+     "d": 0.25,
+     "text": "მი-"
+    },
+    {
+     "t": 63,
+     "d": 2,
+     "text": "ე-"
+    },
+    {
+     "t": 65,
+     "d": 1,
+     "text": "ე-"
+    },
+    {
+     "t": 66,
+     "d": 3,
+     "text": "ერ"
+    },
+    {
+     "t": 69,
+     "d": 0.5,
+     "text": "ჟა-"
+    },
+    {
+     "t": 69.5,
+     "d": 0.5,
+     "text": "მი-"
+    },
+    {
+     "t": 70,
+     "d": 2,
+     "text": "ე-"
     },
     {
      "t": 72,
-     "d": 4,
-     "text": "Mra-"
+     "d": 2,
+     "text": "ერ"
+    },
+    {
+     "t": 74,
+     "d": 2,
+     "text": "მრა-"
     },
     {
      "t": 76,
-     "d": 4,
-     "text": "val,"
+     "d": 1,
+     "text": "ა-"
     },
     {
-     "t": 80,
-     "d": 2,
-     "text": "Mra-"
+     "t": 77,
+     "d": 1,
+     "text": "ა-"
+    },
+    {
+     "t": 78,
+     "d": 4,
+     "text": "ვალ"
     },
     {
      "t": 82,
      "d": 2,
-     "text": "val-"
+     "text": "მრა-"
     },
     {
      "t": 84,
-     "d": 3,
-     "text": "ja-"
+     "d": 2,
+     "text": "ვალ-"
     },
     {
-     "t": 87,
-     "d": 1,
-     "text": "mi,"
+     "t": 86,
+     "d": 2,
+     "text": "ჟა-"
     },
     {
      "t": 88,
-     "d": 0.75,
-     "text": "ja-"
-    },
-    {
-     "t": 88.75,
-     "d": 0.25,
-     "text": "mi-"
+     "d": 1,
+     "text": "ა-"
     },
     {
      "t": 89,
-     "d": 5.5,
-     "text": "er!"
+     "d": 1,
+     "text": "მი-"
+    },
+    {
+     "t": 90,
+     "d": 0.75,
+     "text": "ჟა-"
+    },
+    {
+     "t": 90.75,
+     "d": 0.25,
+     "text": "მი-"
+    },
+    {
+     "t": 91,
+     "d": 1.5,
+     "text": "ე-"
+    },
+    {
+     "t": 92.5,
+     "d": 1.5,
+     "text": "ე-"
+    },
+    {
+     "t": 94,
+     "d": 4,
+     "text": "ერ"
     }
    ]
   }
@@ -1994,6 +2399,18 @@ function edCarve(p, winners) {
   });
   p.notes = out;
 }
+// a note stretched to end at `end`: how far each later note of the part has to move (id -> beats) so that
+// nothing overlaps. Rests after the note are used up first; a note moves only when it would be covered.
+function edPush(p, n, end) {
+  const m = new Map();
+  let e = end;
+  p.notes.filter(o => o.id !== n.id && o.t >= n.t + n.d - EPS).sort((a, b) => a.t - b.t).forEach(o => {
+    const sh = Math.max(0, e - o.t);
+    if (sh > EPS) m.set(o.id, sh);
+    e = Math.max(e, o.t + sh + o.d);
+  });
+  return m;
+}
 function edHit(x, y) {
   const v = laneAt(y);
   if (v < 0) return null;
@@ -2001,7 +2418,11 @@ function edHit(x, y) {
   let best = null;
   p.notes.forEach(n => {
     const x0 = G.X(edTL(n.t)), x1 = G.X(edTL(n.t + n.d, true)), yc = laneYOf(v, n.midi + p.shift);
-    if (x >= x0 - 2 && x <= Math.max(x1, x0 + 4) + 2 && Math.abs(y - yc) <= 6) best = { v, n, edge: x >= Math.max(x0 + 6, x1 - 6) };
+    if (!(x >= x0 - 2 && x <= Math.max(x1, x0 + 4) + 2 && Math.abs(y - yc) <= 6) || (best && best.joint)) return;
+    // where this note touches the next one: right at the crossing (joint) a drag moves the crossing, and the
+    // notes after it follow; just left of it only this note's length changes
+    const end = n.t + n.d, touching = p.notes.some(o => o !== n && Math.abs(o.t - end) < 1e-3), joint = touching && x >= x1 - 3;
+    best = { v, n, joint, edge: joint || x >= Math.max(x0 + 6, x1 - (touching ? 10 : 6)) };
   });
   return best || { v, n: null };
 }
@@ -2032,7 +2453,7 @@ cv.addEventListener('pointerdown', e => {
     else if (!ed.sel.has(hit.n.id)) ed.sel = new Set([hit.n.id]);
     if (!ed.sel.has(hit.n.id)) { draw(); return; }
     edPreview(hit.n.midi + ed.model.parts[hit.v].shift);
-    ed.drag = { kind: hit.edge ? 'resize' : 'move', x0: x, y0: y, v: hit.v, n: hit.n, t0: t, m0: laneMidiAt(hit.v, y), dt: 0, dp: 0, dd: 0, moved: false };
+    ed.drag = { kind: hit.edge ? 'resize' : 'move', ripple: !!hit.joint, x0: x, y0: y, v: hit.v, n: hit.n, t0: t, m0: laneMidiAt(hit.v, y), dt: 0, dp: 0, dd: 0, moved: false };
   } else if (hit && ed.tool === 'draw') {
     const midi = Math.round(laneMidiAt(hit.v, y)) - ed.model.parts[hit.v].shift, st = Math.min(edTotal() - (ed.grid || 0.25), Math.floor((t - ed.P[edBarAt(t)]) / (ed.grid || 0.25)) * (ed.grid || 0.25) + ed.P[edBarAt(t)]);
     const n = { id: ed.nextId++, midi, t: Math.max(0, st), d: ed.grid || 0.5 };
@@ -2049,9 +2470,10 @@ cv.addEventListener('pointermove', e => {
   if (scrub) return;
   const { x, y } = edPoint(e), G = geo(), d = ed.drag;
   if (!d) {
-    if (inScrubZone(x, y)) { cv.style.cursor = 'ew-resize'; return; }
-    const hit = edHit(x, y);
-    cv.style.cursor = ed.tool === 'draw' ? (hit && hit.n ? 'pointer' : 'crosshair') : ed.tool === 'split' ? (hit && hit.n ? 'col-resize' : 'default') : hit && hit.n ? (hit.edge ? 'ew-resize' : 'grab') : 'default';
+    if (inScrubZone(x, y)) { cv.style.cursor = 'ew-resize'; edHover(null); return; }
+    const hit = edHit(x, y), joint = ed.tool !== 'split' && hit && hit.n && hit.joint;
+    edHover(joint ? hit : null);                    // shows that the following notes will move too
+    cv.style.cursor = joint ? 'col-resize' : ed.tool === 'draw' ? (hit && hit.n ? 'pointer' : 'crosshair') : ed.tool === 'split' ? (hit && hit.n ? 'col-resize' : 'default') : hit && hit.n ? (hit.edge ? 'ew-resize' : 'grab') : 'default';
     return;
   }
   if (Math.abs(x - d.x0) + Math.abs(y - d.y0) > 3) d.moved = true;
@@ -2069,6 +2491,13 @@ cv.addEventListener('pointermove', e => {
   } else if (d.kind === 'box') { d.x1 = x; d.y1 = y; }
   draw();
 });
+function edHover(hit) {
+  const id = hit ? hit.n.id : null;
+  if ((ed.hover ? ed.hover.id : null) === id) return;
+  ed.hover = hit ? { v: hit.v, id } : null;
+  draw();
+}
+cv.addEventListener('pointerleave', () => { if (ed.on) edHover(null); });
 function edPointerUp(e) {
   const d = ed.drag;
   if (!ed.on || !d) return;
@@ -2095,14 +2524,35 @@ function edPointerUp(e) {
       sel.forEach(s => { s.n.t = Math.max(0, s.n.t + d.dt); s.n.midi = Math.max(12, Math.min(120, s.n.midi + d.dp)); });
       ed.model.parts.forEach(p => edCarve(p, p.notes.filter(n => ed.sel.has(n.id))));
     } else {
-      // longer: the notes (and words) after it in this part move later instead of being cut; shorter: a rest
+      // longer: it grows into the rest after it; only when it reaches the next note do that note and the ones
+      // touching it (with their words) move later instead of being cut (edPush). Shorter: a rest
       const p = ed.model.parts[d.v], oldEnd = d.n.t + d.n.d;
-      d.n.d = Math.max(ed.grid || 0.0625, d.n.d + d.dd);
-      const delta = d.n.t + d.n.d - oldEnd;
-      if (delta > EPS) {
+      const newD = Math.max(ed.grid || 0.0625, d.n.d + d.dd);
+      const grew = newD > d.n.d + EPS, push = grew && !d.ripple ? edPush(p, d.n, d.n.t + newD) : new Map(), delta = newD - d.n.d;
+      d.n.d = newD;
+      if (d.ripple && Math.abs(delta) > EPS) {        // dragged at the crossing: everything after it in the part follows, either way
         edFixWords();
-        p.notes.forEach(n => { if (n !== d.n && n.t >= oldEnd - EPS) n.t += delta; });
-        (p.lyr || []).forEach(x => { if (x.t >= oldEnd - EPS) x.t += delta; });
+        p.notes.forEach(n => { if (n.id !== d.n.id && n.t >= oldEnd - EPS) n.t += delta; });
+        const WL = p.lyr || [];
+        WL.forEach(x => { if (x.t >= oldEnd - 1e-3) x.t += delta; });
+        WL.sort((a, b) => a.t - b.t);
+        for (let i = 0; i + 1 < WL.length; i++) if (WL[i].t + WL[i].d > WL[i + 1].t + EPS) WL[i].d = Math.max(0.05, WL[i + 1].t - WL[i].t);
+      }
+      if (push.size) {
+        edFixWords();
+        const after = p.notes.filter(n => n.id !== d.n.id && n.t >= oldEnd - EPS).sort((a, b) => a.t - b.t);
+        const WL = p.lyr || [];
+        const ws = WL.map(x => {                       // a word moves with the note it sits on
+          let sh = 0;
+          if (x.t >= oldEnd - 1e-3) for (const n of after) { if (n.t <= x.t + 1e-3) sh = push.get(n.id) || 0; else break; }
+          return sh;
+        });
+        after.forEach(n => { n.t += push.get(n.id) || 0; });
+        WL.forEach((x, i) => { x.t += ws[i]; });
+        WL.sort((a, b) => a.t - b.t);
+        for (let i = 0; i + 1 < WL.length; i++) if (WL[i].t + WL[i].d > WL[i + 1].t + EPS) WL[i].d = Math.max(0.05, WL[i + 1].t - WL[i].t);
+      }
+      if (grew || d.ripple) {
         const L = edUsualBar(), need = edContentEnd();
         while (ed.model.barLen.reduce((a, b) => a + b, 0) < need - 1e-3) ed.model.barLen.push(L);
         edPrefix();
@@ -2128,18 +2578,35 @@ function edNudge(dt, dp) {
   if (dp) { const s = edSelected()[0]; if (s) edPreview(s.n.midi + s.p.shift); }
 }
 function edDelete() { if (ed.sel.size) edChange(() => { ed.model.parts.forEach(p => { p.notes = p.notes.filter(n => !ed.sel.has(n.id)); }); ed.sel.clear(); }); }
+// Copy takes whatever is selected: notes, words, or both (a dragged box selects both). Notes, with or without
+// words, are pasted at the playhead into the parts they came from, keeping their distances; words alone go
+// where the user clicked (lyCopy / lyPaste).
 function edCopy() {
-  const sel = edSelected();
-  if (!sel.length) return false;
-  const t0 = Math.min(...sel.map(s => s.n.t));
+  const sel = edSelected(), words = lySelected();
+  if (!sel.length) { const ok = words.length ? lyCopy() : false; if (ok) $('edPaste').disabled = false; return ok; }
+  const t0 = Math.min(...sel.map(s => s.n.t), ...words.map(x => x.w.t));
   ed.clip = sel.map(s => ({ v: s.v, midi: s.n.midi, t: s.n.t - t0, d: s.n.d }));
+  ed.clipWords = words.map(x => ({ v: x.v, t: x.w.t - t0, d: x.w.d, text: x.w.text }));
   ed.lastCopy = 'notes';
-  edShowState(); return true;
+  if (words.length) {                               // the words can also go into another part on their own (see edPaste)
+    const v0 = words[0].v, mine = words.filter(x => x.v === v0), w0 = Math.min(...mine.map(x => x.w.t));
+    ly.clip = mine.map(x => ({ t: x.w.t - w0, d: x.w.d, text: x.w.text }));
+    ly.clipT0 = w0; ly.clipV = v0; ly.target = null; ly.pasteAt = null;
+  }
+  edShowState();
+  if (words.length) $('edInfo').textContent = 'Copied ' + sel.length + (sel.length === 1 ? ' note and ' : ' notes and ') + words.length + (words.length === 1 ? ' word' : ' words') + '. Ctrl+V puts them at the playhead; to put only the words into another part, click that part first, then Ctrl+V.';
+  return true;
 }
+function edCut() { if (!edCopy()) return; if (lySelected().length) lyDeleteSel(true); else edDelete(); }
 function edPaste() {
+  if (ed.lastCopy === 'words') { lyPaste(); return; }
   if (!ed.clip || !ed.clip.length) return;
   const at = edSnap(edPlain(locate(session ? currentBeat() : cursor).within));
-  edChange(() => {
+  const W = ed.clipWords || [], pasted = [];
+  // words copied along with notes, and since then a part they don't come from was clicked: only the words go
+  // there (Tenor II's words into Tenor I), the notes stay out of it
+  if (W.length && ly.target != null && !ed.clip.some(c => c.v === ly.target) && !W.some(c => c.v === ly.target)) { lyPaste(); return; }
+  const body = list => {
     const added = [];
     ed.clip.forEach(c => {
       const p = ed.model.parts[c.v];
@@ -2149,7 +2616,20 @@ function edPaste() {
     });
     ed.model.parts.forEach(p => edCarve(p, p.notes.filter(n => added.includes(n))));
     ed.sel = new Set(added.map(n => n.id));
-  });
+    const byV = {}, total = edTotal();               // the copied words: those already in the way are replaced
+    W.forEach(c => { const t = at + c.t, dur = Math.min(c.d, total - t); if (ed.model.parts[c.v] && dur > 0.05) (byV[c.v] = byV[c.v] || []).push({ t, d: dur, text: c.text }); });
+    Object.keys(byV).forEach(v => {
+      const L = list(+v), add = byV[v];
+      for (let k = L.length - 1; k >= 0; k--) if (add.some(w => L[k].t < w.t + w.d - 1e-3 && L[k].t + L[k].d > w.t + 1e-3)) L.splice(k, 1);
+      L.push(...add); add.forEach(w => pasted.push({ v: +v, t: +w.t.toFixed(4) }));
+    });
+  };
+  if (W.length) {
+    lyChangeAll(body);
+    ly.multi = pasted;
+    if (!$('lyEdit').hidden) { $('lyEdit').hidden = true; ly.sel = null; }
+    draw(); edShowState();
+  } else edChange(() => body(null));
 }
 function edBars(add) {
   edChange(() => {
@@ -2420,11 +2900,13 @@ function drawEdit(g, G, X, top, laneH, gap, within) {
   }
   g.globalAlpha = 1;
   const playing = !!session ? edPlain(within) : -1;
+  const push = d && d.kind === 'resize' && !d.ripple && d.dd > 0 ? edPush(ed.model.parts[d.v], d.n, d.n.t + d.n.d + d.dd) : null;
   const drawNote = (v, p, n, ghost) => {
     let t = n.t, dd = n.d, midi = n.midi;
     if (d && !ghost && ed.sel.has(n.id) && d.kind === 'move') { t += d.dt; midi += d.dp; }
     if (d && !ghost && (d.kind === 'resize') && d.n === n) dd += d.dd;
-    if (d && !ghost && d.kind === 'resize' && d.dd > 0 && d.v === v && d.n !== n && n.t >= d.n.t + d.n.d - EPS) t += d.dd;
+    if (push && !ghost && d.v === v && push.has(n.id)) t += push.get(n.id);
+    if (d && !ghost && d.kind === 'resize' && d.ripple && d.v === v && d.n.id !== n.id && n.t >= d.n.t + d.n.d - EPS) t += d.dd;
     if (ghost) dd += d.dd;
     const x = X(edTL(t)), xe = X(edTL(t + dd, true));
     if (xe < sl - 20 || x > sl + vw + 20) return;
@@ -2437,6 +2919,26 @@ function drawEdit(g, G, X, top, laneH, gap, within) {
   };
   m.parts.forEach((p, v) => p.notes.forEach(n => drawNote(v, p, n, false)));
   if (d && d.kind === 'new') drawNote(d.v, m.parts[d.v], d.n, true);
+  // the crossing of two touching notes, hovered or being dragged: a line at the crossing and an outline on
+  // every note that moves along
+  const jn = d ? (d.kind === 'resize' && d.ripple ? { v: d.v, id: d.n.id, dd: d.dd } : null) : ed.hover ? { v: ed.hover.v, id: ed.hover.id, dd: 0 } : null;
+  const jp = jn && m.parts[jn.v], jnote = jp && jp.notes.find(o => o.id === jn.id);
+  if (jnote) {
+    const end = jnote.t + jnote.d, xj = Math.round(X(edTL(end + jn.dd, true))) + 0.5, y0 = top + jn.v * (laneH + gap), acc = cssVar('--accent');
+    g.globalAlpha = 1; g.strokeStyle = acc; g.fillStyle = acc; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(xj, y0 + 3); g.lineTo(xj, y0 + laneH - 3); g.stroke();
+    [y0 + 3, y0 + laneH - 3].forEach(yy => {         // arrowheads pointing both ways
+      g.beginPath(); g.moveTo(xj - 9, yy); g.lineTo(xj - 3, yy - 4); g.lineTo(xj - 3, yy + 4); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(xj + 9, yy); g.lineTo(xj + 3, yy - 4); g.lineTo(xj + 3, yy + 4); g.closePath(); g.fill();
+    });
+    g.lineWidth = 1.5;
+    jp.notes.forEach(o => {
+      if (o.id === jnote.id || o.t < end - EPS) return;
+      const x = X(edTL(o.t + jn.dd)), xe = X(edTL(o.t + o.d + jn.dd, true));
+      if (xe < sl - 20 || x > sl + vw + 20) return;
+      g.beginPath(); g.roundRect(x - 2, laneYOf(jn.v, o.midi + jp.shift) - 6, Math.max(3, xe - x - 1) + 4, 12, 3); g.stroke();
+    });
+  }
   if (rec.on && rec.samples.length) {        // what you are singing, over the part being recorded
     g.globalAlpha = 1; g.strokeStyle = cssVar('--accent'); g.lineWidth = 2.5; g.lineCap = 'round';
     let prev = null;
@@ -2459,10 +2961,15 @@ function drawEdit(g, G, X, top, laneH, gap, within) {
 function edShowState() {
   if (!ed.on) return;
   $('edUndo').disabled = !ed.undo.length; $('edRedo').disabled = !ed.redo.length;
-  ['edDel', 'edUp', 'edDown', 'edCopy', 'edCut'].forEach(id => { $(id).disabled = !ed.sel.size; });
-  $('edPaste').disabled = !(ed.clip && ed.clip.length);
+  ['edDel', 'edUp', 'edDown'].forEach(id => { $(id).disabled = !ed.sel.size; });
+  ['edCopy', 'edCut'].forEach(id => { $(id).disabled = !ed.sel.size && !ly.multi.length; });
+  $('edPaste').disabled = ed.lastCopy === 'words' ? !(ly.clip && ly.clip.length) : !(ed.clip && ed.clip.length);
   const sel = edSelected();
-  if (ly.multi.length > 1) { $('edInfo').textContent = ly.multi.length + ' words selected: Ctrl+C copies, Ctrl+X cuts, Delete removes.'; recParts(); projShowState(); return; }
+  if (ly.multi.length && (sel.length || ly.multi.length > 1)) {
+    const nw = ly.multi.length + (ly.multi.length === 1 ? ' word' : ' words');
+    $('edInfo').textContent = (sel.length ? sel.length + (sel.length === 1 ? ' note and ' : ' notes and ') : '') + nw + ' selected: Ctrl+C copies, Ctrl+X cuts, Delete removes.';
+    recParts(); projShowState(); return;
+  }
   $('edInfo').textContent = sel.length === 1 ? 'Selected: ' + noteName(sel[0].n.midi + sel[0].p.shift) + ', ' + (+sel[0].n.d.toFixed(3)) + ' beats, ' + sel[0].p.name
     : sel.length ? sel.length + ' notes selected' : 'Click a note to select it, drag to select several.';
   recParts();
@@ -2475,6 +2982,7 @@ function edSetTool(t) {
 function setEditing(on) {
   if (on && (!piece || piece.audio)) return;
   if (on && sing.on) setSinging(false);
+  ed.hover = null;
   if (!on) { ly.multi = []; if (!$('lyEdit').hidden) lyClose(); }
   if (!on) { if (rec.counting) recStop(); else if (rec.on) { rec.on = false; rec.samples = []; recRestore(); } }
   ed.on = on;
@@ -2498,7 +3006,7 @@ $('edDel').addEventListener('click', edDelete);
 $('edUp').addEventListener('click', () => edNudge(0, 1));
 $('edDown').addEventListener('click', () => edNudge(0, -1));
 $('edCopy').addEventListener('click', edCopy);
-$('edCut').addEventListener('click', () => { if (edCopy()) edDelete(); });
+$('edCut').addEventListener('click', edCut);
 $('edPaste').addEventListener('click', edPaste);
 $('edAddBar').addEventListener('click', () => edBars(true));
 $('edEvenBars').addEventListener('click', edEvenBars);
@@ -2509,11 +3017,9 @@ $('edDelBar').addEventListener('click', () => edBars(false));
 document.addEventListener('keydown', e => {
   if (!ed.on || !ed.model || typing(e.target) || /^(SELECT|INPUT)$/.test(e.target.tagName)) return;
   const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
-  if (mod && k === 'v' && ed.lastCopy === 'words' && ly.clip) { e.preventDefault(); lyPaste(); return; }
-  if (ly.multi.length && mod && (k === 'c' || k === 'x')) { e.preventDefault(); if (lyCopy() && k === 'x') lyDeleteSel(); return; }
-  if (ly.multi.length > 1 && !mod) {                        // several words selected
-    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); lyDeleteSel(); return; }
-    if (e.key === 'Escape') { e.preventDefault(); ly.multi = []; draw(); edShowState(); return; }
+  if ((ly.multi.length > 1 || (ly.multi.length && ed.sel.size)) && !mod) {   // several words, or words and notes, selected
+    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); lyDeleteSel(true); return; }
+    if (e.key === 'Escape' && ly.multi.length > 1) { e.preventDefault(); ly.multi = []; draw(); edShowState(); return; }
   }
   if (ly.sel && !$('lyEdit').hidden && !mod) {               // a word is selected
     let w = true;
@@ -2521,7 +3027,7 @@ document.addEventListener('keydown', e => {
     else if (e.key === 'ArrowLeft') lyNudge(-1);
     else if (e.key === 'ArrowRight') lyNudge(1);
     else if (e.key === 'Escape') lyClose();
-    else if (e.key === 'Enter') $('lyText').focus();
+    else if (e.key === 'Enter') { $('lyText').focus(); $('lyText').select(); }
     else w = false;
     if (w) { e.preventDefault(); return; }
   }
@@ -2529,7 +3035,7 @@ document.addEventListener('keydown', e => {
   if (mod && k === 'z' && !e.shiftKey) edUndo();
   else if (mod && (k === 'y' || (k === 'z' && e.shiftKey))) edRedo();
   else if (mod && k === 'c') edCopy();
-  else if (mod && k === 'x') { if (edCopy()) edDelete(); }
+  else if (mod && k === 'x') edCut();
   else if (mod && k === 'v') edPaste();
   else if (mod && k === 'a') { ed.sel = new Set(ed.model.parts.flatMap(p => p.notes.map(n => n.id))); draw(); edShowState(); }
   else if (e.key === 'Delete' || e.key === 'Backspace') edDelete();
@@ -2868,7 +3374,7 @@ cv.addEventListener('pointerdown', e => {
   }
   ed.sel.clear();
   if (!isSel) ly.multi = [{ v: h.v, t: sy.t }];
-  ly.drag = { v: h.v, i: h.i, kind: h.edge ? 'end' : 'move', x0: x, t0: plainOf(geo().B(x)), nt: sy.t, nd: sy.d, dt: 0, moved: false };
+  ly.drag = { v: h.v, i: h.i, kind: h.edge ? 'end' : 'move', x0: x, t0: plainOf(geo().B(x)), nt: sy.t, nd: sy.d, dt: 0, moved: false, was: isSel && ly.multi.length === 1 };
   if (!h.edge) cv.style.cursor = 'grabbing';
   try { cv.setPointerCapture(e.pointerId); } catch (err) { /* pointer already gone */ }
 }, { capture: true });
@@ -2901,7 +3407,7 @@ cv.addEventListener('pointerup', e => {
   e.stopImmediatePropagation();
   ly.drag = null;
   cv.style.cursor = '';
-  if (!d.moved) { if (ly.multi.length > 1) { ly.multi = [{ v: d.v, t: lyList(d.v)[d.i].t }]; } lyOpen(d.v, d.i); return; }
+  if (!d.moved) { if (ly.multi.length > 1) { ly.multi = [{ v: d.v, t: lyList(d.v)[d.i].t }]; } lyOpen(d.v, d.i, d.was); return; }   // first click selects, a click on the selected word edits its text
   if (d.kind === 'move' && Math.abs(d.dt) < 1e-6) { draw(); return; }
   lyCommit(d.v, list => {
     const sy = list[d.i];
@@ -2924,7 +3430,7 @@ cv.addEventListener('dblclick', e => {
   const next = L.find(sy => sy.t > t + 1e-6), d = Math.min(1, (next ? next.t : plainP[plainP.length - 1]) - t);
   if (d < 0.1) return;
   lyCommit(h.v, list => list.push({ t, d, text: '' }));
-  lyOpen(h.v, lyList(h.v).findIndex(sy => Math.abs(sy.t - t) < 1e-3));
+  lyOpen(h.v, lyList(h.v).findIndex(sy => Math.abs(sy.t - t) < 1e-3), true);
 });
 
 // several words: selection, copy, paste, delete (one undo step each)
@@ -2960,10 +3466,11 @@ function lyCopy() {
   $('edInfo').textContent = 'Copied ' + ly.clip.length + (ly.clip.length === 1 ? ' word' : ' words') + '. Click a part where they should go (or just pick the part) and press Ctrl+V.';
   return true;
 }
-function lyDeleteSel() {
+function lyDeleteSel(notesToo) {
   const items = lySelected();
   if (!items.length) return;
   lyChangeAll(list => {
+    if (notesToo && ed.sel.size) { ed.model.parts.forEach(p => { p.notes = p.notes.filter(n => !ed.sel.has(n.id)); }); ed.sel.clear(); }
     const byV = {};
     items.forEach(x => { (byV[x.v] = byV[x.v] || []).push(x.w.t); });
     Object.keys(byV).forEach(v => { const L = list(+v); for (let k = L.length - 1; k >= 0; k--) if (byV[v].some(t => Math.abs(L[k].t - t) < 1e-3)) L.splice(k, 1); });
@@ -3006,7 +3513,9 @@ function lyNudge(dir) {
   });
   lyOpen(v, i);
 }
-function lyOpen(v, i) {
+// edit = put the typing cursor into the text box; without it the word is only selected and the keyboard stays
+// with the score (Delete/Backspace removes the word, ←/→ move it, Ctrl+C copies, Enter starts typing)
+function lyOpen(v, i, edit) {
   const L = lyList(v), sy = L[i];
   if (!sy) { lyClose(); return; }
   ly.sel = { v, i };
@@ -3017,7 +3526,8 @@ function lyOpen(v, i) {
   $('lyMsg').textContent = '';
   $('lyEdit').hidden = false;
   draw();
-  $('lyText').focus(); $('lyText').select();
+  if (edit) { $('lyText').focus(); $('lyText').select(); }
+  else if (document.activeElement === $('lyText')) $('lyText').blur();
 }
 function lyClose() { $('lyEdit').hidden = true; ly.sel = null; draw(); }
 function lyApply(goNext) {
@@ -3026,7 +3536,7 @@ function lyApply(goNext) {
   if (!L[i]) return;
   const txt = $('lyText').value.trim();
   if (txt !== L[i].text) lyCommit(v, list => { list[i].text = txt; });
-  if (goNext && i + 1 < lyList(v).length) lyOpen(v, i + 1); else lyOpen(v, i);
+  if (goNext && i + 1 < lyList(v).length) lyOpen(v, i + 1, true); else lyOpen(v, i, true);
 }
 $('lyApply').addEventListener('click', () => lyApply(false));
 $('lyDelete').addEventListener('click', () => {
@@ -3038,8 +3548,8 @@ $('lyDelete').addEventListener('click', () => {
   if (lyList(v).length) lyOpen(v, Math.min(i, lyList(v).length - 1)); else lyClose();
 });
 $('lyClose').addEventListener('click', lyClose);
-$('lyPrev').addEventListener('click', () => { if (ly.sel) lyOpen(ly.sel.v, ly.sel.i - 1); });
-$('lyNext').addEventListener('click', () => { if (ly.sel) lyOpen(ly.sel.v, ly.sel.i + 1); });
+$('lyPrev').addEventListener('click', () => { if (ly.sel) lyOpen(ly.sel.v, ly.sel.i - 1, true); });
+$('lyNext').addEventListener('click', () => { if (ly.sel) lyOpen(ly.sel.v, ly.sel.i + 1, true); });
 $('lyText').addEventListener('keydown', e => {
   const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase(), L = ly.sel ? lyList(ly.sel.v) : [];
   if (mod && (k === 'z' || k === 'y') && ly.sel && L[ly.sel.i] && $('lyText').value.trim() === L[ly.sel.i].text) {
@@ -3950,7 +4460,7 @@ $('keyForget').addEventListener('click', () => {
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); EXAMPLE is used when it can't load.
 var STUDIO = /[?&]studio\b/.test(location.search);
-const BUILD = '4 Nov 2026, 21:25';   // shown in the header, to see which version a browser has
+const BUILD = '12 Nov 2026, 12:50';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
 $('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
 if (STUDIO) document.title = 'Polyphony Studio';
