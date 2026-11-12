@@ -105,6 +105,7 @@ input[type=range] { accent-color: var(--accent); }
 .vol span { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 
 .roll { padding: 12px; }
+#piano:not([hidden]) { display: block; width: 100%; touch-action: none; cursor: grab; border-radius: 6px; }
 .rollwrap { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
 canvas { display: block; cursor: pointer; }
 .rolltools { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -338,7 +339,10 @@ body.studio .user-only { display: none !important; }
         <button class="small" id="zOut" type="button" aria-label="Zoom out">&minus;</button>
         <button class="small" id="zIn" type="button" aria-label="Zoom in">+</button>
       </div>
+      <button class="small toggle" id="pianoOn" type="button" aria-pressed="false" style="--c: var(--accent)" title="Show the notes falling onto a piano keyboard">Piano view</button>
     </div>
+    <div id="pianowrap"><canvas id="piano" hidden role="img" aria-label="Piano view: the notes of the voices fall onto a keyboard; drag up or down to move through the song"></canvas></div>
+    <p class="note" id="pianoNote" hidden>Each voice has its colour. Drag the falling notes up or down to move through the song; press a key to hear it. + and &minus; change how far ahead you see.</p>
     <div class="rollwrap" id="rollwrap"><canvas id="roll" role="img" aria-label="Piano roll of the voices; click or drag to move the playhead"></canvas></div>
     <div class="baredit studio-only" id="lyEdit" hidden>
       <div class="actions">
@@ -371,6 +375,10 @@ body.studio .user-only { display: none !important; }
       <button class="small keybtn" id="keyDown2" type="button" aria-label="Transpose down a semitone">&minus;</button>
       <output id="keyOut2" aria-live="polite">0</output>
       <button class="small keybtn" id="keyUp2" type="button" aria-label="Transpose up a semitone">+</button>
+    </div>
+    <div class="ctl" title="How the voices sound: a choir that sings the words, a choir on &quot;aah&quot;, or the plain tones">
+      <label for="sound">Sound</label>
+      <select id="sound"><option value="words">Choir, words</option><option value="choir">Choir, aah</option><option value="plain">Plain</option></select>
     </div>
     <div class="ctl" id="repsCtl">
       <label for="reps">Repeat</label>
@@ -2016,6 +2024,114 @@ function formantsFor(vi) {
   return avg < 55 ? [560, 900] : avg < 64 ? [620, 1050] : [700, 1150];
 }
 
+// Choir sound. Each voice is three sawtooth "singers" through four formant filters (the mouth). The filter
+// settings below are the usual formant frequencies of the five vowels for a bass, a tenor and an alto; with
+// "Choir, words" they follow the vowels of the words under the notes, and the consonants are hinted at:
+// m n l r v as a short hum, s sh kh ... as a hiss, b d g k t ... as a tiny stop and click. It is a choir
+// vocalising the text, not speech: the vowels are clear, the consonants only suggested.
+let soundMode = lsGet('pp.sound') || 'words';
+if (!/^(words|choir|plain)$/.test(soundMode)) soundMode = 'words';
+const CH_Q = [5, 8, 12, 12];
+const CH_GAIN = { a: [1, 0.5, 0.45, 0.4], e: [1, 0.2, 0.25, 0.2], i: [1, 0.18, 0.13, 0.1], o: [1, 0.32, 0.25, 0.25], u: [1, 0.1, 0.14, 0.2], m: [0.6, 0.05, 0.03, 0.02], z: [0.75, 0.14, 0.06, 0.04] };
+const CH_MAKEUP = { a: 1, e: 1.25, i: 1.5, o: 1.15, u: 1.4, m: 1, z: 1 };
+const CH_VOWELS = {
+  bass: { a: [600, 1040, 2250, 2450], e: [400, 1620, 2400, 2800], i: [250, 1750, 2600, 3050], o: [400, 750, 2400, 2600], u: [350, 600, 2400, 2675], m: [250, 1100, 2200, 2900], z: [280, 1600, 2300, 2900] },
+  tenor: { a: [650, 1080, 2650, 2900], e: [400, 1700, 2600, 3200], i: [290, 1870, 2800, 3250], o: [400, 800, 2600, 2800], u: [350, 600, 2700, 2900], m: [250, 1200, 2300, 3000], z: [280, 1750, 2500, 3000] },
+  alto: { a: [800, 1150, 2800, 3500], e: [400, 1600, 2700, 3300], i: [350, 1700, 2700, 3700], o: [450, 800, 2830, 3500], u: [325, 700, 2530, 3500], m: [270, 1250, 2400, 3200], z: [300, 1850, 2700, 3300] }
+};
+// letters (Georgian and Latin) -> vowel, or kind of consonant with the pitch of its hiss
+const CH_LETTER = {};
+[['a', 'აa'], ['e', 'ეe'], ['i', 'იiy'], ['o', 'ოo'], ['u', 'უu']].forEach(([v, cs]) => [...cs].forEach(c => { CH_LETTER[c] = { v }; }));
+[['son', 0, 'მნლრვmnlrvw'], ['fric', 6000, 'სზცძწszc'], ['fric', 3200, 'შჟჩჯჭjx'], ['fric', 1600, 'ხღჰhf'], ['stop', 2500, 'ბპფდტთგკქყbpdtgkq']]
+  .forEach(([kind, band, cs]) => [...cs].forEach(c => { CH_LETTER[c] = { kind, band, voiced: kind === 'son' || 'ზჟღძჯბდგzjbdg'.includes(c) }; }));
+const chParsed = new Map();
+// a word -> its vowels in order, the consonant it starts with and the one it ends with (the strongest of each group)
+function choirParse(text) {
+  if (chParsed.has(text)) return chParsed.get(text);
+  const rank = { stop: 3, fric: 2, son: 1 }, strongest = list => list.reduce((b, c) => !b || rank[c.kind] > rank[b.kind] ? c : b, null);
+  const v = [], on = [];
+  let tail = [];
+  [...String(text).toLowerCase()].forEach(ch => {
+    const L = CH_LETTER[ch];
+    if (!L) return;
+    if (L.v) { v.push(L.v); tail = []; } else if (!v.length) on.push(L); else tail.push(L);
+  });
+  const r = { v, on: strongest(on), co: strongest(tail) };
+  chParsed.set(text, r);
+  return r;
+}
+function choirRoom() {                              // a made-up hall: 2.6 s of fading noise, different in each ear
+  if (ctx._room) return ctx._room;
+  const sr = ctx.sampleRate, n = Math.floor(sr * 2.6), buf = ctx.createBuffer(2, n, sr);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    let lp = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr, x = t < 0.015 ? 0 : (Math.random() * 2 - 1) * Math.pow(10, -3 * t / 2.3);
+      lp += (x - lp) * 0.35; d[i] = lp;
+    }
+  }
+  return (ctx._room = buf);
+}
+function choirHiss(c, band, at, dur, level, soft) { // soft: swells and fades, no steady part       // the noise of a consonant
+  if (!ctx._noise) {
+    const b = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    ctx._noise = b;
+  }
+  const t0 = Math.max(ctx.currentTime, at), src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+  src.buffer = ctx._noise; src.loop = true;
+  bp.type = 'bandpass'; bp.frequency.value = band; bp.Q.value = soft ? 0.7 : band > 2000 ? 1.4 : 0.8;
+  g.gain.setValueAtTime(0, t0);
+  g.gain.linearRampToValueAtTime(level, t0 + dur * (soft ? 0.5 : 0.25));
+  g.gain.setValueAtTime(level, t0 + dur * (soft ? 0.5 : 0.7));
+  g.gain.linearRampToValueAtTime(0, t0 + dur);
+  src.connect(bp); bp.connect(g); g.connect(c.dest);
+  src.start(t0, Math.random() * 0.5); src.stop(t0 + dur + 0.02);
+  c.oscs.push(src);
+}
+// moves one voice's formant filters through the words: the vowel lands on the word's start, its first
+// consonant comes just before, its last consonant just before the word ends
+function choirWords(vi, c) {
+  const now = ctx.currentTime;
+  const shape = (name, at, tau) => {
+    const f = c.T[name], gn = CH_GAIN[name], mk = CH_MAKEUP[name] * 1.5, t = Math.max(now, at);
+    c.fl.forEach((x, k) => { x.bp.frequency.setTargetAtTime(f[k], t, tau); x.g.gain.setTargetAtTime(gn[k] * mk, t, tau); });
+  };
+  c.fl.forEach((x, k) => { x.bp.frequency.setValueAtTime(c.T.a[k], now); x.g.gain.setValueAtTime(CH_GAIN.a[k] * 1.5, now); });
+  c.artic.gain.setValueAtTime(1, now);
+  const close = (to, from, until) => {              // shut the mouth for a moment
+    c.artic.gain.setTargetAtTime(to, Math.max(now, from), 0.008);
+    c.artic.gain.setTargetAtTime(1, Math.max(now, until), 0.012);
+  };
+  const consonant = (k, at) => {                    // at = the moment the consonant ends
+    if (k.kind === 'son') shape('m', at - 0.07, 0.015);
+    else if (k.kind === 'stop') { close(0, at - 0.06, at); choirHiss(c, k.band, at - 0.02, 0.03, 0.22); }
+    else if (k.voiced) {
+      // z, zh, gh ...: the voice keeps sounding with the mouth nearly shut (a buzz that opens into the vowel),
+      // and only a faint breath of noise runs through it and on into the vowel
+      shape('z', at - 0.09, 0.02);
+      choirHiss(c, Math.min(k.band, 2600), at - 0.08, 0.13, 0.035, true);
+    } else { close(0.12, at - 0.1, at); choirHiss(c, k.band, at - 0.09, 0.09, k.band > 5000 ? 0.1 : 0.15); }
+  };
+  const words = c.words && !piece.audio ? (piece.voices[vi].lyr || []) : [];
+  for (let p = 0; p < c.reps; p++) words.forEach(w => {
+    const ph = choirParse(w.text);
+    if (!ph.v.length) return;
+    const a0 = p * (PASS + GAP) + tlOf(w.t), a1 = p * (PASS + GAP) + tlOf(w.t + w.d, true);
+    if (a1 <= c.c0 + 1e-3) return;
+    const s = c.t0 + Math.max(a0, c.c0) * c.bd, e = c.t0 + a1 * c.bd, len = e - s;
+    if (a0 >= c.c0 - 1e-3 && ph.on) consonant(ph.on, s);
+    ph.v.forEach((v, i) => shape(v, i ? s + len * i / ph.v.length : s, i ? 0.04 : 0.02));
+    if (ph.co && len > 0.3) consonant(ph.co, e);
+  });
+}
+$('sound').value = soundMode;
+$('sound').addEventListener('change', e => {
+  soundMode = e.target.value; lsSet('pp.sound', soundMode);
+  if (session) seekTo(currentBeat());
+});
+
 function startPlay(from) {
   stopAudio();
   if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -2026,29 +2142,62 @@ function startPlay(from) {
   let c0 = from === undefined ? cursor : from;
   if (c0 >= total - 0.05) c0 = 0;
   const t0 = ctx.currentTime + 0.15 - c0 * bd;   // time of beat 0 of the first pass
-  const master = ctx.createGain(); master.gain.value = 0.9;
+  const choir = soundMode !== 'plain';
+  const master = ctx.createGain(); master.gain.value = choir ? 0.8 : 0.9;
   const comp = ctx.createDynamicsCompressor();
   master.connect(comp); comp.connect(ctx.destination);
+  if (choir) {                                    // the room the choir stands in
+    const conv = ctx.createConvolver(), wet = ctx.createGain();
+    conv.buffer = choirRoom(); wet.gain.value = 0.45;
+    master.connect(conv); conv.connect(wet); wet.connect(comp);
+  }
   const oscs = [], out = [];
 
   for (let vi = 0; vi < nV; vi++) {
     const bus = ctx.createGain();
     const o = ctx.createGain(); o.gain.value = voiceLevel(vi);
-    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1500;
-    const dry = ctx.createGain(); dry.gain.value = 0.35;
-    bus.connect(lp); lp.connect(dry); dry.connect(o);
-    const fm = formantsFor(vi);
-    fm.forEach((f, k) => {
-      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 5;
-      const g = ctx.createGain(); g.gain.value = k ? 0.9 : 1.4;
-      bus.connect(bp); bp.connect(g); g.connect(o);
-    });
+    const fm = formantsFor(vi), low = fm[0] < 600;
+    let singers;                                  // the oscillators of one note: detune, vibrato, late start
+    if (!choir) {
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1500;
+      const dry = ctx.createGain(); dry.gain.value = 0.35;
+      bus.connect(lp); lp.connect(dry); dry.connect(o);
+      fm.forEach((f, k) => {
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 5;
+        const g = ctx.createGain(); g.gain.value = k ? 0.9 : 1.4;
+        bus.connect(bp); bp.connect(g); g.connect(o);
+      });
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 5.2 + vi * 0.3;
+      const lfoG = ctx.createGain(); lfoG.gain.value = 7;
+      lfo.connect(lfoG); lfo.start(); lfo.stop(t0 + total * bd + 1);
+      oscs.push(lfo);
+      singers = [{ cents: 0, lfoG, delay: 0 }, { cents: 6, lfoG, delay: 0 }];
+    } else {
+      // three singers a few cents apart, each with its own vibrato, through one mouth: four formant filters
+      // that move from vowel to vowel with the words (choirWords)
+      const T = CH_VOWELS[fm[0] < 600 ? 'bass' : fm[0] < 700 ? 'tenor' : 'alto'];
+      const tilt = ctx.createBiquadFilter(); tilt.type = 'lowpass'; tilt.frequency.value = 3400; tilt.Q.value = 0.5;
+      const artic = ctx.createGain(), dry = ctx.createGain(); dry.gain.value = 0.1;
+      bus.connect(tilt); tilt.connect(dry); dry.connect(artic);
+      const fl = CH_Q.map((q, k) => {
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = q;
+        const g = ctx.createGain();
+        tilt.connect(bp); bp.connect(g); g.connect(artic);
+        return { bp, g };
+      });
+      let dest = o;
+      if (ctx.createStereoPanner) { const pan = ctx.createStereoPanner(); pan.pan.value = nV > 1 ? -0.4 + 0.8 * vi / (nV - 1) : 0; pan.connect(o); dest = pan; }
+      artic.connect(dest);
+      choirWords(vi, { fl, artic, dest, T, t0, bd, c0, reps, oscs, words: soundMode === 'words' });
+      singers = [-9, 0, 8].map((cents, k) => {
+        const lfo = ctx.createOscillator(); lfo.frequency.value = 4.7 + 0.5 * k + vi * 0.17;
+        const lfoG = ctx.createGain(); lfoG.gain.value = 8 + 2 * k;
+        lfo.connect(lfoG); lfo.start(); lfo.stop(t0 + total * bd + 1);
+        oscs.push(lfo);
+        return { cents: cents + (vi % 2 ? 2 : -2), lfoG, delay: k * 0.011 };
+      });
+    }
     o.connect(master); out.push(o);
-    const lfo = ctx.createOscillator(); lfo.frequency.value = 5.2 + vi * 0.3;
-    const lfoG = ctx.createGain(); lfoG.gain.value = 7;
-    lfo.connect(lfoG); lfo.start(); lfo.stop(t0 + total * bd + 1);
-    oscs.push(lfo);
-    const low = fm[0] < 600;
     events.filter(e => e.v === vi).forEach(e => {
       for (let p = 0; p < reps; p++) {
         const a0 = p * (PASS + GAP) + e.start, a1 = a0 + e.dur;
@@ -2056,21 +2205,21 @@ function startPlay(from) {
         const eff = Math.max(a0, c0);
         const s = t0 + eff * bd;
         const len = (a1 - eff) * bd;
-        const end = s + len * 0.96;
-        const att = Math.min(0.06, len * 0.4), rel = Math.min(0.09, len * 0.4);
+        const end = s + len * (choir ? 0.985 : 0.96);
+        const att = Math.min(choir ? 0.08 : 0.06, len * 0.4), rel = Math.min(choir ? 0.12 : 0.09, len * 0.4);
         const env = ctx.createGain();
-        const peak = low ? 0.26 : 0.2;
+        const peak = choir ? (low ? 0.15 : 0.12) : (low ? 0.26 : 0.2);
         env.gain.setValueAtTime(0, s);
         env.gain.linearRampToValueAtTime(peak, s + att);
         env.gain.setValueAtTime(peak, Math.max(s + att, end - rel));
-        env.gain.linearRampToValueAtTime(0, end + 0.04);
+        env.gain.linearRampToValueAtTime(0, end + (choir ? 0.07 : 0.04));
         env.connect(bus);
         const f = 440 * Math.pow(2, (e.midi - 69) / 12);
-        [0, 6].forEach(cents => {
+        singers.forEach(sg => {
           const osc = ctx.createOscillator();
-          osc.type = 'sawtooth'; osc.frequency.value = f; osc.detune.value = cents;
-          lfoG.connect(osc.detune); osc.connect(env);
-          osc.start(s); osc.stop(end + 0.1);
+          osc.type = 'sawtooth'; osc.frequency.value = f; osc.detune.value = sg.cents;
+          sg.lfoG.connect(osc.detune); osc.connect(env);
+          osc.start(s + sg.delay); osc.stop(end + 0.15);
           oscs.push(osc);
         });
       }
@@ -2147,6 +2296,7 @@ function staffInfo(vi) {
 }
 function draw() {
   if (!piece) return;
+  if (pv.on) { drawPiano(); return; }
   const within = locate(cursor).within;
   const dpr = window.devicePixelRatio || 1;
   const G = geo(), W = G.W, X = G.X;
@@ -2258,6 +2408,161 @@ function setZoom(z) {
 }
 $('zIn').addEventListener('click', () => setZoom(zoom * 1.5));
 $('zOut').addEventListener('click', () => setZoom(zoom / 1.5));
+
+/* ---------- piano view: the notes fall onto a keyboard ---------- */
+// A second way to show the same score (button "Piano view", remembered in pp.piano): time runs downwards,
+// every note is a bar in its voice's colour above the key it sounds on, and reaches the keyboard when it
+// starts; the keys that sound at the playhead are lit. Uses `events` (sounding pitches, one pass), so muting,
+// transposing and repeats work as in the roll. Editing mode needs the roll and switches this off.
+const pcv = $('piano');
+const pv = { on: false, drag: null, L: null, fallH: 0, ppb: 44 };
+const PV_BLACK = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0];
+function pvLayout(W) {
+  let lo = Infinity, hi = -Infinity;
+  events.forEach(e => { if (e.midi < lo) lo = e.midi; if (e.midi > hi) hi = e.midi; });
+  if (!isFinite(lo)) { lo = 48; hi = 72; }
+  lo = Math.floor((lo - 1) / 12) * 12; hi = Math.ceil((hi + 2) / 12) * 12;      // from a C to a C, with room at both ends
+  while (hi - lo < 24) hi += 12;
+  let nWhite = 0;
+  for (let m = lo; m <= hi; m++) if (!PV_BLACK[m % 12]) nWhite++;
+  const ww = W / nWhite, bw = ww * 0.6, rect = new Map();
+  let wi = 0;
+  for (let m = lo; m <= hi; m++) {
+    if (PV_BLACK[m % 12]) rect.set(m, { x: wi * ww - bw / 2, w: bw, black: true });
+    else { rect.set(m, { x: wi * ww, w: ww, black: false }); wi++; }
+  }
+  return { lo, hi, ww, bw, rect };
+}
+function drawPiano() {
+  const dpr = window.devicePixelRatio || 1, W = Math.max(240, $('pianowrap').clientWidth || 600);
+  const keyH = 92, fallH = Math.max(200, Math.min(440, Math.round(window.innerHeight * 0.46))), H = fallH + keyH;
+  if (pcv.width !== Math.round(W * dpr) || pcv.height !== Math.round(H * dpr)) {
+    pcv.width = Math.round(W * dpr); pcv.height = Math.round(H * dpr); pcv.style.height = H + 'px';
+  }
+  const g = pcv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  const L = pvLayout(W), ppb = 44 * zoom, within = locate(cursor).within;
+  pv.L = L; pv.fallH = fallH; pv.ppb = ppb;
+  const line = cssVar('--line'), muted = cssVar('--muted'), ink = cssVar('--ink'), bg = cssVar('--bg');
+  const cols = [cssVar('--v1'), cssVar('--v2'), cssVar('--v3'), cssVar('--v4')];
+  const Y = t => fallH - (t - within) * ppb;       // where a moment is: the keyboard's top edge is now
+
+  // background: a column for every key, darker for the black ones, a line at every C
+  g.fillStyle = bg; g.fillRect(0, 0, W, fallH);
+  L.rect.forEach((r, m) => {
+    if (r.black) { g.globalAlpha = 0.28; g.fillStyle = line; g.fillRect(r.x, 0, r.w, fallH); g.globalAlpha = 1; }
+    else if (m % 12 === 0 && r.x > 0) { g.strokeStyle = line; g.lineWidth = 1; const x = Math.round(r.x) + 0.5; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, fallH); g.stroke(); }
+  });
+  g.save();
+  g.beginPath(); g.rect(0, 0, W, fallH); g.clip();
+  // bar lines with their numbers
+  g.font = '11px ' + cssVar('--font-mono'); g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  barStart.forEach((s, i) => {
+    const y = Math.round(Y(s)) + 0.5;
+    if (y < -2 || y > fallH + 14) return;
+    g.strokeStyle = line; g.lineWidth = 1; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
+    g.fillStyle = muted; g.fillText(piece.audio ? mmss(s) : String(i + 1), 4, y - 4);
+  });
+  // notes; the same key in several voices: the later voices are a little narrower, so all stay visible
+  const lit = new Map(), byVoice = piece.voices.map(() => []);
+  events.forEach(e => {
+    byVoice[e.v].push(e);
+    const r = L.rect.get(e.midi);
+    if (!r) return;
+    const on = state.on[e.v], act = within >= e.start - 1e-6 && within < e.start + e.dur - 1e-6;
+    if (act && on) { if (!lit.has(e.midi)) lit.set(e.midi, []); lit.get(e.midi).push(e.v); }
+    const yb = Y(e.start), yt = Y(e.start + e.dur);
+    if (yb < 0 || yt > fallH) return;
+    const w = Math.max(4, r.w * (1 - 0.1 * Math.min(4, e.v)) - 2), x = r.x + (r.w - w) / 2, h = Math.max(3, yb - yt - 1.5);
+    g.globalAlpha = on ? (act ? 1 : 0.88) : 0.16;
+    g.fillStyle = cols[e.v % 4];
+    g.beginPath(); g.roundRect(x, yt, w, h, Math.min(4, w / 2, h / 2)); g.fill();
+    g.strokeStyle = act && on ? ink : bg; g.lineWidth = act && on ? 1.5 : 1; g.globalAlpha = on ? 1 : 0.16; g.stroke();
+  });
+  g.globalAlpha = 1;
+  // the words, each where its note starts
+  if (!piece.audio) {
+    g.font = '11px ' + cssVar('--font-body'); g.textAlign = 'center';
+    piece.voices.forEach((v, vi) => {
+      if (!state.on[vi]) return;
+      (v.lyr || []).forEach(wd => {
+        if (!wd.text) return;
+        const t = tlOf(wd.t), y = Y(t);
+        if (y < 10 || y > fallH + 2) return;
+        const e = byVoice[vi].find(n => t >= n.start - 1e-3 && t < n.start + n.dur - 1e-3), r = e && L.rect.get(e.midi);
+        if (!r) return;
+        const tw = g.measureText(wd.text).width, cx = Math.max(tw / 2 + 4, Math.min(W - tw / 2 - 4, r.x + r.w / 2));
+        g.globalAlpha = 0.82; g.fillStyle = bg; g.beginPath(); g.roundRect(cx - tw / 2 - 3, y - 15, tw + 6, 13, 3); g.fill();
+        g.globalAlpha = 1; g.fillStyle = cols[vi % 4]; g.fillText(wd.text, cx, y - 5);
+      });
+    });
+    g.textAlign = 'left';
+  }
+  g.restore();
+
+  // the keyboard; a key that sounds now takes the colour of its voice (stripes when several voices share it)
+  const light = (r, vs, h) => {
+    const sw = r.w / vs.length;
+    vs.forEach((v, k) => { g.fillStyle = cols[v % 4]; g.fillRect(r.x + k * sw, fallH, sw, h); });
+  };
+  L.rect.forEach((r, m) => {
+    if (r.black) return;
+    g.fillStyle = '#f6f6f2'; g.fillRect(r.x, fallH, r.w, keyH);
+    if (lit.has(m)) light(r, lit.get(m), keyH);
+    g.strokeStyle = '#8b959a'; g.lineWidth = 1; g.strokeRect(Math.round(r.x) + 0.5, fallH + 0.5, r.w, keyH - 1);
+    if (m % 12 === 0 && r.w >= 16) { g.fillStyle = lit.has(m) ? '#ffffff' : '#5c6a70'; g.font = '10px ' + cssVar('--font-mono'); g.textAlign = 'center'; g.fillText('C' + (m / 12 - 1), r.x + r.w / 2, fallH + keyH - 7); g.textAlign = 'left'; }
+  });
+  const bh = Math.round(keyH * 0.62);
+  L.rect.forEach((r, m) => {
+    if (!r.black) return;
+    g.fillStyle = '#1c2124'; g.fillRect(r.x, fallH, r.w, bh);
+    if (lit.has(m)) { light({ x: r.x + 1.5, w: r.w - 3 }, lit.get(m), bh - 2); }
+    g.strokeStyle = '#1c2124'; g.lineWidth = 1; g.strokeRect(r.x + 0.5, fallH + 0.5, r.w - 1, bh - 1);
+  });
+  g.fillStyle = ink; g.fillRect(0, fallH - 1, W, 2);                 // now
+}
+function setPiano(on) {
+  if (on && ed.on) setEditing(false);
+  pv.on = on; pv.drag = null;
+  $('pianoOn').setAttribute('aria-pressed', String(on));
+  wrap.hidden = on; pcv.hidden = !on; $('pianoNote').hidden = !on;
+  try { if (on) localStorage.setItem('pp.piano', '1'); else localStorage.removeItem('pp.piano'); } catch (e) { /* storage blocked */ }
+  draw();
+}
+$('pianoOn').addEventListener('click', () => setPiano(!pv.on));
+// drag the falling notes to move through the song (playback pauses meanwhile); press a key to hear it
+pcv.addEventListener('pointerdown', e => {
+  if (!pv.on || !pv.L || e.button > 0) return;
+  const r = pcv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  if (y >= pv.fallH) {
+    let hit = null;
+    const inKey = (k, h) => x >= k.x && x < k.x + k.w && y < pv.fallH + h;
+    pv.L.rect.forEach((k, m) => { if (k.black && inKey(k, 92 * 0.62)) hit = m; });
+    if (hit == null) pv.L.rect.forEach((k, m) => { if (!k.black && inKey(k, 92)) hit = m; });
+    if (hit != null) edPreview(hit);
+    return;
+  }
+  const was = !!session;
+  if (was) pausePlay();
+  pv.drag = { y0: y, c0: cursor, was };
+  pcv.style.cursor = 'grabbing';
+  try { pcv.setPointerCapture(e.pointerId); } catch (err) { /* pointer already gone */ }
+});
+pcv.addEventListener('pointermove', e => {
+  const d = pv.drag;
+  if (!d) return;
+  const y = e.clientY - pcv.getBoundingClientRect().top;
+  showPos(Math.max(0, Math.min(totalBeats(), d.c0 + (y - d.y0) / pv.ppb)));
+});
+function pvDragEnd() {
+  const d = pv.drag;
+  if (!d) return;
+  pv.drag = null; pcv.style.cursor = '';
+  if (d.was) startPlay(cursor);
+}
+pcv.addEventListener('pointerup', pvDragEnd);
+pcv.addEventListener('pointercancel', pvDragEnd);
 
 /* ---------- editing mode ---------- */
 // Edit the notes right on the piano roll: select, drag in time and pitch, stretch, draw new notes, split,
@@ -2995,6 +3300,7 @@ function edSetTool(t) {
 function setEditing(on) {
   if (on && (!piece || piece.audio)) return;
   if (on && sing.on) setSinging(false);
+  if (on && pv.on) setPiano(false);
   ed.hover = null;
   if (!on) { ly.multi = []; if (!$('lyEdit').hidden) lyClose(); }
   if (!on) { if (rec.counting) recStop(); else if (rec.on) { rec.on = false; rec.samples = []; recRestore(); } }
@@ -4483,7 +4789,7 @@ $('keyForget').addEventListener('click', () => {
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); EXAMPLE is used when it can't load.
 var STUDIO = /[?&]studio\b/.test(location.search);
-const BUILD = '12 Nov 2026, 13:10';   // shown in the header, to see which version a browser has
+const BUILD = '12 Nov 2026, 14:45';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
 $('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
 if (STUDIO) document.title = 'Polyphony Studio';
@@ -4673,6 +4979,7 @@ document.addEventListener('keydown', e => {
 
 
 loadRaw(EXAMPLE, 'Example');
+if (lsGet('pp.piano')) setPiano(true);
 $('readMsg').textContent = '';
 songKeyLoaded = songKey(EXAMPLE);
 showLibrary();
