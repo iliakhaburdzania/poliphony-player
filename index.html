@@ -3269,6 +3269,16 @@ function snapPlain(t) {
   const g = (ed.on && ed.grid) || 0.25, b = barOfPlain(t);
   return Math.max(0, Math.min(plainP[plainP.length - 1], plainP[b] + Math.round((t - plainP[b]) / g) * g));
 }
+// where a dragged or new word edge lands: on the grid, or on the start or end of a note of that part when
+// that is nearer (within 8 px), so a word can sit exactly on a note that is off the grid
+function lySnap(v, t) {
+  let best = snapPlain(t);
+  const p = ed.on && ed.model && ed.model.parts[v];
+  if (!p) return best;
+  const G = geo(), tol = Math.abs(G.B(108) - G.B(100));
+  p.notes.forEach(n => [n.t, n.t + n.d].forEach(e => { const dist = Math.abs(e - t); if (dist <= tol && dist <= Math.abs(best - t) + 1e-6) best = e; }));
+  return best;
+}
 function lyPad() { return piece && !piece.audio && piece.voices.some(v => v.lyr && v.lyr.length) ? 20 : 0; }   // extra lane room for words
 function lyPerBar(list, P) {
   const out = Array(Math.max(0, P.length - 1)).fill('');
@@ -3359,7 +3369,7 @@ cv.addEventListener('pointerdown', e => {
   if (e.button > 0) return;
   const { x, y } = lyPoint(e), h = lyHit(x, y), add = e.shiftKey || e.ctrlKey || e.metaKey;
   if (!h || h.i < 0) {                             // not on a word: the score's own click and drag
-    if (ed.on && h && h.i < 0) { ly.target = h.v; ly.pasteAt = snapPlain(plainOf(geo().B(x))); }
+    if (ed.on && h && h.i < 0) { ly.target = h.v; ly.pasteAt = lySnap(h.v, plainOf(geo().B(x))); }
     if (ed.on && !add && ly.multi.length && !inScrubZone(x, y)) { ly.multi = []; if (!$('lyEdit').hidden) lyClose(); }
     return;
   }
@@ -3391,12 +3401,12 @@ cv.addEventListener('pointermove', e => {
   const t = plainOf(geo().B(x)), total = plainP[plainP.length - 1], minLen = 0.125;
   if (d.kind === 'end') {
     const limit = next ? next.t : total;
-    d.nd = Math.min(limit, Math.max(sy.t + minLen, snapPlain(t))) - sy.t;
+    d.nd = Math.min(limit, Math.max(sy.t + minLen, lySnap(d.v, t))) - sy.t;
   } else {
     const joinP = prev && Math.abs(prev.t + prev.d - sy.t) < 1e-3, joinN = next && Math.abs(sy.t + sy.d - next.t) < 1e-3;
     const lo = prev ? (joinP ? prev.t + minLen : prev.t + prev.d) : 0;
     const hi = next ? (joinN ? next.t + next.d - minLen : next.t) - sy.d : total - sy.d;
-    d.nt = Math.max(lo, Math.min(hi, snapPlain(sy.t + (t - d.t0))));
+    d.nt = Math.max(lo, Math.min(hi, lySnap(d.v, sy.t + (t - d.t0))));
     d.dt = d.nt - sy.t; d.joinP = joinP; d.joinN = joinN;
   }
   draw();
@@ -3425,7 +3435,7 @@ cv.addEventListener('pointercancel', () => { if (ly.drag) { ly.drag = null; draw
 cv.addEventListener('dblclick', e => {
   const { x, y } = lyPoint(e), h = lyHit(x, y);
   if (!h || h.i >= 0) return;
-  const t = snapPlain(plainOf(geo().B(x))), L = lyList(h.v);
+  const t = lySnap(h.v, plainOf(geo().B(x))), L = lyList(h.v);
   if (L.some(sy => sy.t <= t + 1e-6 && t < sy.t + sy.d - 1e-6)) return;     // inside a word's time already
   const next = L.find(sy => sy.t > t + 1e-6), d = Math.min(1, (next ? next.t : plainP[plainP.length - 1]) - t);
   if (d < 0.1) return;
@@ -4460,7 +4470,7 @@ $('keyForget').addEventListener('click', () => {
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); EXAMPLE is used when it can't load.
 var STUDIO = /[?&]studio\b/.test(location.search);
-const BUILD = '12 Nov 2026, 12:50';   // shown in the header, to see which version a browser has
+const BUILD = '12 Nov 2026, 13:00';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
 $('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
 if (STUDIO) document.title = 'Polyphony Studio';
