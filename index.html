@@ -412,7 +412,7 @@ const EXAMPLE = {
  "fermataBars": [],
  "lyrics": [
   "",
-  "ა-ა-",
+  "მრა-ა-ა-",
   "ვალ",
   "ჟა-ა-მი-",
   "ერ მრა-",
@@ -467,10 +467,15 @@ const EXAMPLE = {
     "E5:2 F5:2~",
     "F5:1 F5:1 E5:0.75 E5:0.25 E5:1~",
     "E5:4~",
-    "E5:2",
+    "E5:2 r:2",
     "r:4"
    ],
    "lyricsTimed": [
+    {
+     "t": 4,
+     "d": 2,
+     "text": "მრა-"
+    },
     {
      "t": 6,
      "d": 1,
@@ -663,12 +668,12 @@ const EXAMPLE = {
     },
     {
      "t": 69,
-     "d": 0.5,
+     "d": 0.75,
      "text": "ჟა-"
     },
     {
-     "t": 69.5,
-     "d": 0.5,
+     "t": 69.75,
+     "d": 0.25,
      "text": "მი-"
     },
     {
@@ -781,7 +786,7 @@ const EXAMPLE = {
     "C5:2 D5:2",
     "A4:1 B4:1 C5:0.75 C5:0.25 C5:1~",
     "C5:0.5 A4:1.5 G4:2~",
-    "G4:2",
+    "G4:2 r:2",
     "r:4"
    ],
    "lyricsTimed": [
@@ -982,12 +987,12 @@ const EXAMPLE = {
     },
     {
      "t": 69,
-     "d": 0.5,
+     "d": 0.75,
      "text": "ჟა-"
     },
     {
-     "t": 69.5,
-     "d": 0.5,
+     "t": 69.75,
+     "d": 0.25,
      "text": "მი-"
     },
     {
@@ -1100,10 +1105,15 @@ const EXAMPLE = {
     "G3:2 G3:2~",
     "G3:1 G3:1 C3:0.75 C3:0.25 C3:1~",
     "C3:4~",
-    "C3:2",
+    "C3:2 r:2",
     "r:4"
    ],
    "lyricsTimed": [
+    {
+     "t": 4,
+     "d": 2,
+     "text": "მრა-"
+    },
     {
      "t": 6,
      "d": 1,
@@ -1296,12 +1306,12 @@ const EXAMPLE = {
     },
     {
      "t": 69,
-     "d": 0.5,
+     "d": 0.75,
      "text": "ჟა-"
     },
     {
-     "t": 69.5,
-     "d": 0.5,
+     "t": 69.75,
+     "d": 0.25,
      "text": "მი-"
     },
     {
@@ -1414,10 +1424,15 @@ const EXAMPLE = {
     "G3:2 G3:2~",
     "G3:1 G3:1 C3:0.75 C3:0.25 C3:1~",
     "C3:4~",
-    "C3:2",
+    "C3:2 r:2",
     "r:4"
    ],
    "lyricsTimed": [
+    {
+     "t": 4,
+     "d": 2,
+     "text": "მრა-"
+    },
     {
      "t": 6,
      "d": 1,
@@ -1610,12 +1625,12 @@ const EXAMPLE = {
     },
     {
      "t": 69,
-     "d": 0.5,
+     "d": 0.75,
      "text": "ჟა-"
     },
     {
-     "t": 69.5,
-     "d": 0.5,
+     "t": 69.75,
+     "d": 0.25,
      "text": "მი-"
     },
     {
@@ -2634,7 +2649,7 @@ function edPaste() {
 function edBars(add) {
   edChange(() => {
     const m = ed.model;
-    if (add) { m.barLen.push(m.barLen[m.barLen.length - 1] || 4); if (m.meta.lyrics && m.meta.lyrics.length) m.meta.lyrics.push(''); }
+    if (add) { m.barLen.push(edUsualBar()); if (m.meta.lyrics && m.meta.lyrics.length) m.meta.lyrics.push(''); }
     else if (m.barLen.length > 1) {
       m.barLen.pop();
       const end = m.barLen.reduce((a, b) => a + b, 0);
@@ -2724,14 +2739,12 @@ function edRemovePause(len) {
 // re-divide the whole song into bars of the usual length; nothing moves in time
 function edEvenBars() {
   const L = edUsualBar(), total = edTotal();
-  if (ed.model.barLen.every((l, i) => Math.abs(l - L) < 1e-3 || i === ed.model.barLen.length - 1)) { $('edInfo').textContent = 'All bars already have the usual length (' + L + ' beats).'; return; }
+  if (ed.model.barLen.every(l => Math.abs(l - L) < 1e-3)) { $('edInfo').textContent = 'All bars already have the usual length (' + L + ' beats).'; return; }
   edChange(() => {
     const m = ed.model, oldP = ed.P.slice();
     edFixWords();
     const n = Math.max(1, Math.ceil(total / L - 1e-6));
-    m.barLen = Array(n).fill(L);
-    const last = total - (n - 1) * L;
-    if (last > 1e-3) m.barLen[n - 1] = last;
+    m.barLen = Array(n).fill(L);                    // the last bar is a full one too: what is left of it is a rest
     edPrefix();
     edMoveMarks(oldP, t => t);
     if (m.parts[0].lyr) m.meta.lyrics = lyPerBar(m.parts[0].lyr, ed.P);
@@ -4470,7 +4483,7 @@ $('keyForget').addEventListener('click', () => {
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); EXAMPLE is used when it can't load.
 var STUDIO = /[?&]studio\b/.test(location.search);
-const BUILD = '12 Nov 2026, 13:00';   // shown in the header, to see which version a browser has
+const BUILD = '12 Nov 2026, 13:10';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
 $('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
 if (STUDIO) document.title = 'Polyphony Studio';
