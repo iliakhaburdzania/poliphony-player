@@ -188,7 +188,7 @@ body.studio .user-only { display: none !important; }
 <main>
   <header>
     <div class="meta" id="appName">Polyphony player</div>
-    <h1 id="title">Ceduri Mravaljamier</h1>
+    <h1 id="title">Loading the songs&hellip;</h1>
     <div class="meta" id="subtitle"></div>
   </header>
 
@@ -210,7 +210,6 @@ body.studio .user-only { display: none !important; }
     <div class="actions">
       <button class="primary" id="read" type="button" disabled>Read score</button>
       <button class="small" id="stopRead" type="button" hidden>Stop</button>
-      <button class="small" id="example" type="button">Load the example</button>
     </div>
     <p class="msg" id="readMsg"></p>
     <ul class="issues" id="issues" hidden></ul>
@@ -267,6 +266,8 @@ body.studio .user-only { display: none !important; }
     <div class="singhead">
       <button class="small toggle" id="editOn" type="button" aria-pressed="false" style="--c: var(--accent)">Editing mode</button>
       <button class="primary" id="songSave" type="button" title="Save this song into songs.json in the app folder (Ctrl+S)">Save</button>
+      <button class="small" id="pianoPdf" type="button" title="Download the song as sheet music, as a PDF ready to print: each tenor on its own line, the basses together (needs the internet the first time)">Export PDF</button>
+      <button class="small" id="pianoExport" type="button" title="Download the piano sheet music as a MusicXML file: open it in MuseScore or other notation software to change the notes">Export MusicXML</button>
       <p class="msg" id="projMsg"></p>
       <div hidden><select id="projList"></select><button id="projOpen" type="button"></button><button id="projDelete" type="button"></button></div>
     </div>
@@ -278,7 +279,7 @@ body.studio .user-only { display: none !important; }
           <button class="small" type="button" data-tool="split" aria-pressed="false" title="Cut a note in two where you click (S)">Split</button>
         </div>
         <div class="ctl"><label for="edGrid">Grid</label>
-          <select id="edGrid"><option value="1">1 beat</option><option value="0.5" selected>1/2 beat</option><option value="0.25">1/4 beat</option><option value="0.3333333">1/3 (triplet)</option><option value="0">Off</option></select></div>
+          <select id="edGrid"><option value="1">1 beat</option><option value="0.5" selected>1/2 beat</option><option value="0.25">1/4 beat</option><option value="0.125">1/8 beat</option><option value="0.0625">1/16 beat</option><option value="0.3333333">1/3 (triplet)</option><option value="0">Off</option></select></div>
         <div class="seg" role="group" aria-label="Pitch">
           <button class="small" type="button" id="edUp" title="Up a semitone (↑; Shift+↑ an octave)">&#9650; Pitch</button>
           <button class="small" type="button" id="edDown" title="Down a semitone (↓; Shift+↓ an octave)">&#9660; Pitch</button>
@@ -303,6 +304,8 @@ body.studio .user-only { display: none !important; }
           <select id="edPauseLen" aria-label="Pause length"><option value="0.5">&frac12; beat</option><option value="1" selected>1 beat</option><option value="2">2 beats</option><option value="4">4 beats</option></select>
           <button class="small" type="button" id="edPause" title="Insert silence at the playhead in all voices (P)">Insert pause</button>
           <button class="small" type="button" id="edUnpause" title="Remove silent time at the playhead">Remove pause</button>
+          <button class="small" type="button" id="edEndHere" title="Put the end of the song at the playhead: the player and singing mode stop there">End here</button>
+          <button class="small" type="button" id="edEndAuto" title="Take the end line away: the song ends where its last note ends">End at last note</button>
         </div>
         <div class="seg" role="group" aria-label="Bars">
           <button class="small" type="button" id="edAddBar" title="Add a bar at the end">+ Bar</button>
@@ -317,9 +320,6 @@ body.studio .user-only { display: none !important; }
         <button class="small" type="button" id="recBtn" title="Count in, then sing the selected notes, or from the playhead's bar until you press Stop">&#9679; Record</button>
       </div>
       <p class="note edinfo" id="edInfo"></p>
-      <p class="note">Sing to edit: select the notes to redo (or put the playhead where to start), choose the part and press Record. After a count-in the other voices play while you sing; headphones help. Fix pitches keeps the rhythm; New notes writes what you sang on the grid.</p>
-      <p class="note">Words: click a word above the notes to select it (Delete or Backspace removes it, ←/→ move it); click it again, or press Enter, to type its text (Enter then goes to the next one), drag it to move it, drag its right edge to make it longer or shorter, double-click empty space above a part's notes to add one. Shift-click or drag a box to select several; Ctrl+C copies them, click where they should go in another part and press Ctrl+V. A box dragged over notes and words selects both: Ctrl+C / Ctrl+X take them together and Ctrl+V puts them at the playhead, in the same parts; click another part first and Ctrl+V puts only the words there. With one word selected, ←/→ move it; Delete removes the selected words. Ctrl+Z / Ctrl+Y undo and redo notes and words alike. Save (Ctrl+S) keeps the song in songs.json.</p>
-      <p class="note">Drag a note to move it in time and pitch; drag its right end to change its length (made longer, it fills the rest after it; the next notes move later only when it reaches them). Where two notes touch, dragging right at the crossing moves the crossing and all later notes of the part follow, earlier or later: a line with arrows and outlines on those notes show it while you point there. Just left of the crossing only that note changes. Drag on empty space to select several notes, Shift-click to add one. Arrow keys move the selection (Shift+↑/↓ by an octave). Click empty space to move the playhead, or drag the playhead line or the bar numbers; Paste and Insert pause work there. A pause adds silence in all voices and moves the rest of the piece later; bars keep their length.</p>
       <div class="actions" hidden>
         <input id="projName" type="text" placeholder="Project name" aria-label="Project name" maxlength="80">
         <button class="primary" type="button" id="projSave">Save project</button>
@@ -410,1321 +410,9 @@ body.studio .user-only { display: none !important; }
 
 <script>
 /*DATA*/
-const EXAMPLE = {
- "title": "Ceduri Mravaljamier",
- "subtitle": "Many Years (Georgian) · ცედური მრავალჟამიერ · Traditional",
- "tempo": 70,
- "repeatTimes": 1,
- "transpose": -2,
- "breathAfter": [],
- "fermataBars": [],
- "lyrics": [
-  "",
-  "მრა-ა-ა-",
-  "ვალ",
-  "ჟა-ა-მი-",
-  "ერ მრა-",
-  "ა-ა-ვალ",
-  "ჟა-",
-  "ა-მი-ე-",
-  "ერ მრა-",
-  "ა-ა-ვალ",
-  "ჟა-მი-ე-",
-  "ერ მრა-",
-  "ა-ა-ვალ",
-  "მრა-",
-  "ვალ-ჟა-",
-  "ა-მი-ჟა-მი-ე-",
-  "ე-ერ",
-  "ჟა-მი-ე-",
-  "ერ მრა-",
-  "ა-ა-ვალ",
-  "მრა-",
-  "ვალ-ჟა-",
-  "ა-მი-ჟა-მი-ე-",
-  "ე-ერ",
-  "",
-  ""
- ],
- "voices": [
-  {
-   "name": "Tenor 1",
-   "octaveShift": -12,
-   "bars": [
-    "r:4",
-    "E5:2 C5:1 D5:1",
-    "E5:4",
-    "E5:2 F5:1 F5:1",
-    "E5:2 D5:2",
-    "B4:1 C5:1 D5:2~",
-    "D5:2 D5:2",
-    "E5:1 E5:1 D5:2",
-    "E5:2 E5:2~",
-    "E5:2 F5:2~",
-    "F5:1 F5:0.75 F5:0.25 F5:2",
-    "E5:2 E5:2",
-    "F5:1 E5:1 D5:2~",
-    "D5:2 D5:2",
-    "E5:2 F5:2~",
-    "F5:1 F5:1 E5:0.75 E5:0.25 E5:1~",
-    "E5:1 E5:1 F5:2~",
-    "F5:1 F5:0.75 F5:0.25 F5:2",
-    "E5:2 E5:2",
-    "F5:1 E5:1 D5:2~",
-    "D5:2 D5:2",
-    "E5:2 F5:2~",
-    "F5:1 F5:1 E5:0.75 E5:0.25 E5:1~",
-    "E5:4~",
-    "E5:2 r:2",
-    "r:4"
-   ],
-   "lyricsTimed": [
-    {
-     "t": 4,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 6,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 7,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 8,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 12,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 14,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 15,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 16,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 18,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 20,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 21,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 22,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 26,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 28,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 29,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 30,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 32,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 34,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 36,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 37,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 38,
-     "d": 3,
-     "text": "ვალ"
-    },
-    {
-     "t": 41,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 41.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 42,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 44,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 46,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 48,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 49,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 50,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 54,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 56,
-     "d": 2,
-     "text": "ვალ-"
-    },
-    {
-     "t": 58,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 60,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 61,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 62,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 62.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 63,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 65,
-     "d": 1,
-     "text": "ე-"
-    },
-    {
-     "t": 66,
-     "d": 3,
-     "text": "ერ"
-    },
-    {
-     "t": 69,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 69.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 70,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 72,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 74,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 76,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 77,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 78,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 82,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 84,
-     "d": 2,
-     "text": "ვალ-"
-    },
-    {
-     "t": 86,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 88,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 89,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 90,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 90.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 91,
-     "d": 1.5,
-     "text": "ე-"
-    },
-    {
-     "t": 92.5,
-     "d": 1.5,
-     "text": "ე-"
-    },
-    {
-     "t": 94,
-     "d": 4,
-     "text": "ერ"
-    }
-   ]
-  },
-  {
-   "name": "Tenor 2",
-   "octaveShift": -12,
-   "bars": [
-    "G4:4~",
-    "G4:2 E4:1 F4:1",
-    "G4:4",
-    "G4:2 A4:1 A4:1",
-    "G4:2 F4:2",
-    "D4:1 E4:1 F4:2~",
-    "F4:2 F4:2",
-    "G4:1 G4:1 F4:2",
-    "G4:2 G4:2",
-    "C5:1 B4:1 A4:2~",
-    "A4:1 B4:0.75 C5:0.25 D5:2",
-    "C5:2 C5:2",
-    "D5:1 C5:1 B4:2~",
-    "B4:2 B4:2",
-    "C5:2 D5:2",
-    "A4:1 B4:1 C5:0.75 C5:0.25 C5:1~",
-    "C5:1 B4:1 A4:2~",
-    "A4:1 B4:0.75 C5:0.25 D5:2",
-    "C5:2 C5:2",
-    "D5:1 C5:1 B4:2~",
-    "B4:2 B4:2",
-    "C5:2 D5:2",
-    "A4:1 B4:1 C5:0.75 C5:0.25 C5:1~",
-    "C5:0.5 A4:1.5 G4:2~",
-    "G4:2 r:2",
-    "r:4"
-   ],
-   "lyricsTimed": [
-    {
-     "t": 0,
-     "d": 6,
-     "text": "მაშ მრა-"
-    },
-    {
-     "t": 6,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 7,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 8,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 12,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 14,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 15,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 16,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 18,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 20,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 21,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 22,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 26,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 28,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 29,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 30,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 32,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 34,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 36,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 37,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 38,
-     "d": 3,
-     "text": "ვალ"
-    },
-    {
-     "t": 41,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 41.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 42,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 44,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 46,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 48,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 49,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 50,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 54,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 56,
-     "d": 2,
-     "text": "ვალ-"
-    },
-    {
-     "t": 58,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 60,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 61,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 62,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 62.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 63,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 65,
-     "d": 1,
-     "text": "ე-"
-    },
-    {
-     "t": 66,
-     "d": 3,
-     "text": "ერ"
-    },
-    {
-     "t": 69,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 69.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 70,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 72,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 74,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 76,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 77,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 78,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 82,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 84,
-     "d": 2,
-     "text": "ვალ-"
-    },
-    {
-     "t": 86,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 88,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 89,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 90,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 90.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 91,
-     "d": 1.5,
-     "text": "ე-"
-    },
-    {
-     "t": 92.5,
-     "d": 1.5,
-     "text": "ე-"
-    },
-    {
-     "t": 94,
-     "d": 4,
-     "text": "ერ"
-    }
-   ]
-  },
-  {
-   "name": "Bass 1",
-   "octaveShift": 0,
-   "bars": [
-    "r:4",
-    "C3:4",
-    "C3:4",
-    "C3:3 C3:1",
-    "C3:2 G3:2~",
-    "G3:2 G3:2~",
-    "G3:2 G3:2",
-    "G3:1 G3:1 G3:2",
-    "C3:4~",
-    "C3:2 F3:2~",
-    "F3:1 F3:0.75 F3:0.25 G3:2~",
-    "G3:2 G3:2~",
-    "G3:2 G3:2~",
-    "G3:2 G3:2",
-    "G3:2 G3:2~",
-    "G3:1 G3:1 C3:0.75 C3:0.25 C3:1~",
-    "C3:1 C3:1 F3:2~",
-    "F3:1 F3:0.75 F3:0.25 G3:2~",
-    "G3:2 G3:2~",
-    "G3:2 G3:2~",
-    "G3:2 G3:2",
-    "G3:2 G3:2~",
-    "G3:1 G3:1 C3:0.75 C3:0.25 C3:1~",
-    "C3:4~",
-    "C3:2 r:2",
-    "r:4"
-   ],
-   "lyricsTimed": [
-    {
-     "t": 4,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 6,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 7,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 8,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 12,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 14,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 15,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 16,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 18,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 20,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 21,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 22,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 26,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 28,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 29,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 30,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 32,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 34,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 36,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 37,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 38,
-     "d": 3,
-     "text": "ვალ"
-    },
-    {
-     "t": 41,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 41.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 42,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 44,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 46,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 48,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 49,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 50,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 54,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 56,
-     "d": 2,
-     "text": "ვალ-"
-    },
-    {
-     "t": 58,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 60,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 61,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 62,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 62.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 63,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 65,
-     "d": 1,
-     "text": "ე-"
-    },
-    {
-     "t": 66,
-     "d": 3,
-     "text": "ერ"
-    },
-    {
-     "t": 69,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 69.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 70,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 72,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 74,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 76,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 77,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 78,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 82,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 84,
-     "d": 2,
-     "text": "ვალ-"
-    },
-    {
-     "t": 86,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 88,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 89,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 90,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 90.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 91,
-     "d": 1.5,
-     "text": "ე-"
-    },
-    {
-     "t": 92.5,
-     "d": 1.5,
-     "text": "ე-"
-    },
-    {
-     "t": 94,
-     "d": 4,
-     "text": "ერ"
-    }
-   ]
-  },
-  {
-   "name": "Bass 2",
-   "octaveShift": 0,
-   "bars": [
-    "r:4",
-    "C3:4",
-    "C3:4",
-    "C3:3 C3:1",
-    "C3:2 G2:2~",
-    "G2:2 G2:2~",
-    "G2:2 G2:2",
-    "G2:1 G2:1 G2:2",
-    "C3:4~",
-    "C3:2 F3:2~",
-    "F3:1 F3:0.75 F3:0.25 G3:2~",
-    "G3:2 G3:2~",
-    "G3:2 G3:2~",
-    "G3:2 G3:2",
-    "G3:2 G3:2~",
-    "G3:1 G3:1 C3:0.75 C3:0.25 C3:1~",
-    "C3:1 C3:1 F3:2~",
-    "F3:1 F3:0.75 F3:0.25 G3:2~",
-    "G3:2 G3:2~",
-    "G3:2 G3:2~",
-    "G3:2 G3:2",
-    "G3:2 G3:2~",
-    "G3:1 G3:1 C3:0.75 C3:0.25 C3:1~",
-    "C3:4~",
-    "C3:2 r:2",
-    "r:4"
-   ],
-   "lyricsTimed": [
-    {
-     "t": 4,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 6,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 7,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 8,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 12,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 14,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 15,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 16,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 18,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 20,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 21,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 22,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 26,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 28,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 29,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 30,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 32,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 34,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 36,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 37,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 38,
-     "d": 3,
-     "text": "ვალ"
-    },
-    {
-     "t": 41,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 41.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 42,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 44,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 46,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 48,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 49,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 50,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 54,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 56,
-     "d": 2,
-     "text": "ვალ-"
-    },
-    {
-     "t": 58,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 60,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 61,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 62,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 62.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 63,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 65,
-     "d": 1,
-     "text": "ე-"
-    },
-    {
-     "t": 66,
-     "d": 3,
-     "text": "ერ"
-    },
-    {
-     "t": 69,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 69.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 70,
-     "d": 2,
-     "text": "ე-"
-    },
-    {
-     "t": 72,
-     "d": 2,
-     "text": "ერ"
-    },
-    {
-     "t": 74,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 76,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 77,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 78,
-     "d": 4,
-     "text": "ვალ"
-    },
-    {
-     "t": 82,
-     "d": 2,
-     "text": "მრა-"
-    },
-    {
-     "t": 84,
-     "d": 2,
-     "text": "ვალ-"
-    },
-    {
-     "t": 86,
-     "d": 2,
-     "text": "ჟა-"
-    },
-    {
-     "t": 88,
-     "d": 1,
-     "text": "ა-"
-    },
-    {
-     "t": 89,
-     "d": 1,
-     "text": "მი-"
-    },
-    {
-     "t": 90,
-     "d": 0.75,
-     "text": "ჟა-"
-    },
-    {
-     "t": 90.75,
-     "d": 0.25,
-     "text": "მი-"
-    },
-    {
-     "t": 91,
-     "d": 1.5,
-     "text": "ე-"
-    },
-    {
-     "t": 92.5,
-     "d": 1.5,
-     "text": "ე-"
-    },
-    {
-     "t": 94,
-     "d": 4,
-     "text": "ერ"
-    }
-   ]
-  }
- ]
-};
+// No song is built in: the songs always come from songs.json. This one silent bar only gives the page
+// something to stand on until they have loaded, or when they can't be.
+const BLANK = { title: 'Loading the songs\u2026', subtitle: '', tempo: 72, voices: [{ name: 'Voice', bars: ['r:4'] }] };
 /*END*/
 
 const PROMPT = `You are transcribing a musical score from the attached picture(s) into data for a playback engine. If several pictures are attached they are consecutive pages or systems of one score, in order. Read every staff carefully, bar by bar, left to right, system by system, and do not invent music that is not on the page.
@@ -1835,7 +523,8 @@ function normalizePiece(raw) {
       subtitle: String(raw.subtitle || '').slice(0, 200),
       tempo: Math.max(40, Math.min(160, Math.round(Number(raw.tempo)) || 72)),
       reps: Math.max(1, Math.min(3, Math.round(Number(raw.repeatTimes)) || 1)), transpose,
-      voices: parts, breath: nums(raw.breathAfter), fermata: nums(raw.fermataBars), lyrics
+      voices: parts, breath: nums(raw.breathAfter), fermata: nums(raw.fermataBars), lyrics,
+      end: Number(raw.end) > 0 ? Number(raw.end) : null
     },
     warns, info,
     uncertain: Array.isArray(raw.uncertain) ? raw.uncertain.map(String).filter(Boolean).slice(0, 12) : []
@@ -1862,7 +551,7 @@ function normalizeAudio(raw) {
 const $ = id => document.getElementById(id);
 const AUDIO_BAR = 5;   // seconds per grid column when a recording is shown
 const BREATH = 0.4, GAP = 1.5, FERMATA = 2;   // extra beats: after a breath mark, between repeats, held at a fermata
-let piece = null, barStart = [], PASS = 0, events = [], range = [], nV = 0, cursor = 0;
+let piece = null, barStart = [], PASS = 0, FULL = 0, END_TL = 0, events = [], range = [], nV = 0, cursor = 0;
 let state = { on: [] }, volEls = [], ctx = null, session = null, raf = 0, lastBar = -1, seekTimer = 0, resume = false;
 
 function buildPiece(raw) {
@@ -1877,7 +566,7 @@ function buildPiece(raw) {
     barLen.push(L); barStart.push(acc);
     acc += L + (piece.breath.has(b + 1) ? BREATH : 0) + (piece.fermata.has(b + 1) ? FERMATA : 0);
   }
-  PASS = acc;
+  PASS = FULL = acc;
   plainP = [0];
   barLen.forEach(l => plainP.push(plainP[plainP.length - 1] + l));
   // each part's lyrics on the timeline: as written for it ("lyricsTimed"), or the per-bar lyrics spread
@@ -1900,6 +589,7 @@ function buildPiece(raw) {
       events.push(prev);
     }));
   });
+  setPass();
   range = piece.voices.map((_, vi) => {
     const ms = events.filter(e => e.v === vi).map(e => e.midi);
     return ms.length ? [Math.min(...ms), Math.max(...ms)] : [60, 61];
@@ -1971,6 +661,23 @@ function loadRaw(raw, from) {
   return from + ': ' + piece.voices.length + ' parts, ' + bars + ' bars' + fm + '.';
 }
 
+// One pass of the song ends where its last note ends, or at the end line put in editing mode ("end" in the
+// score, in plain beats) - not at the end of the last bar. PASS is that playable length; FULL is the length
+// of all the bars. In editing mode PASS = FULL, so the room after the end stays reachable, and the end is
+// drawn as a line (drawEdit).
+function songEnd() {
+  if (!piece || piece.audio) return FULL;
+  let e = 0;
+  if (piece.end != null) e = tlOf(Math.min(piece.end, plainP[plainP.length - 1]), true);
+  else events.forEach(x => { e = Math.max(e, x.start + x.dur); });
+  return e > 0.01 ? Math.min(e, FULL) : FULL;
+}
+function setPass() {
+  const L = PASS > 0 ? locate(cursor) : null;
+  END_TL = songEnd();
+  PASS = ed.on ? FULL : END_TL;
+  if (L) cursor = L.p * (PASS + GAP) + Math.min(L.within, PASS);
+}
 /* ---------- position ---------- */
 function totalBeats() { return (+$('reps').value - 1) * (PASS + GAP) + PASS; }
 function mmss(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
@@ -2000,7 +707,7 @@ function showPos(c) {
   const L = locate(cursor);
   markBar(L.b);
   const reps = +$('reps').value;
-  $('status').textContent = (piece.audio ? 'time ' + mmss(L.within) + ' / ' + mmss(PASS) : 'bar ' + (L.b + 1) + ' / ' + barStart.length) + (reps > 1 ? ' · pass ' + (L.p + 1) + ' / ' + reps : '');
+  $('status').textContent = (piece.audio ? 'time ' + mmss(L.within) + ' / ' + mmss(PASS) : 'bar ' + (L.b + 1) + ' / ' + Math.max(1, barStart.filter(x => x < PASS - 1e-6).length)) + (reps > 1 ? ' · pass ' + (L.p + 1) + ' / ' + reps : '');
   updateSeek();
   if (!session) syncButtons();
   draw();
@@ -2118,7 +825,8 @@ function choirWords(vi, c) {
   for (let p = 0; p < c.reps; p++) words.forEach(w => {
     const ph = choirParse(w.text);
     if (!ph.v.length) return;
-    const a0 = p * (PASS + GAP) + tlOf(w.t), a1 = p * (PASS + GAP) + tlOf(w.t + w.d, true);
+    if (tlOf(w.t) >= PASS - 1e-6) return;
+    const a0 = p * (PASS + GAP) + tlOf(w.t), a1 = p * (PASS + GAP) + Math.min(PASS, tlOf(w.t + w.d, true));
     if (a1 <= c.c0 + 1e-3) return;
     const s = c.t0 + Math.max(a0, c.c0) * c.bd, e = c.t0 + a1 * c.bd, len = e - s;
     if (a0 >= c.c0 - 1e-3 && ph.on) consonant(ph.on, s);
@@ -2198,9 +906,9 @@ function startPlay(from) {
       });
     }
     o.connect(master); out.push(o);
-    events.filter(e => e.v === vi).forEach(e => {
+    events.filter(e => e.v === vi && e.start < PASS - 1e-6).forEach(e => {
       for (let p = 0; p < reps; p++) {
-        const a0 = p * (PASS + GAP) + e.start, a1 = a0 + e.dur;
+        const a0 = p * (PASS + GAP) + e.start, a1 = a0 + Math.min(e.dur, PASS - e.start);   // nothing sounds past the end
         if (a1 <= c0 + 0.001) continue;
         const eff = Math.max(a0, c0);
         const s = t0 + eff * bd;
@@ -2301,7 +1009,7 @@ function draw() {
   const dpr = window.devicePixelRatio || 1;
   const G = geo(), W = G.W, X = G.X;
   const staff = viewMode === 'staff' && !ed.on;
-  const laneH = staff ? 104 : (ed.on && ed.range ? edLaneH() : (nV <= 3 ? 84 : 66)) + lyPad(), top = 24, gap = 8;
+  const laneH = staff ? 104 : (ed.on && ed.range ? edLaneH() : (nV <= 3 ? 84 : 66) + (sing.on ? 24 : 0)) + lyPad(), top = 24, gap = 8;
   const lyH = 0, lyY = top + nV * (laneH + gap);
   const H = top + nV * laneH + (nV - 1) * gap + (lyH ? gap + lyH : 0) + 4;
   if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
@@ -2371,7 +1079,7 @@ function draw() {
       if (sharp) { g.font = '12px ' + cssVar('--font-body'); g.fillText('\u266F', x - 15, y + 4); g.font = '11px ' + cssVar('--font-mono'); }
       if (active && state.on[e.v]) { g.strokeStyle = ink; g.lineWidth = 1.5; g.beginPath(); g.ellipse(x, y, 6.5, 5, -0.35, 0, Math.PI * 2); g.stroke(); }
     } else {
-      const [lo, hi] = range[e.v];
+      const [lo, hi] = laneRange(e.v);
       const y = y0 + laneH - 12 - ((e.midi - lo) / Math.max(1, hi - lo)) * (laneH - 34 - lyPad());
       const w = Math.max(2, xe - x - 1);
       g.beginPath(); g.roundRect(x, y - 3.5, w, 7, 2); g.fill();
@@ -2592,7 +1300,7 @@ function edFromPiece() {
   });
   ed.model = {
     meta: { title: piece.title, subtitle: piece.subtitle, tempo: +$('tempo').value || piece.tempo, repeatTimes: piece.reps,
-      transpose: piece.transpose || 0, breathAfter: [...piece.breath].sort((a, b) => a - b), fermataBars: [...piece.fermata].sort((a, b) => a - b), lyrics: piece.lyrics.slice() },
+      end: piece.end, transpose: piece.transpose || 0, breathAfter: [...piece.breath].sort((a, b) => a - b), fermataBars: [...piece.fermata].sort((a, b) => a - b), lyrics: piece.lyrics.slice() },
     barLen, parts
   };
   ed.P = P; ed.sel.clear(); ed.range = null;
@@ -2629,6 +1337,7 @@ function edToRaw(m) {
   const meta = Object.assign({}, m.meta);
   if (!meta.lyrics || !meta.lyrics.some(Boolean)) delete meta.lyrics;
   if (!meta.transpose) delete meta.transpose;
+  if (meta.end == null) delete meta.end;
   return Object.assign(meta, { voices });
 }
 
@@ -2656,12 +1365,18 @@ function edRanges() {
   range = ed.range.map(r => r.slice());
 }
 function edLaneH() { const [lo, hi] = ed.range[0]; return Math.max(120, (hi - lo) * ED_PX + 34); }
+// the pitches a lane shows from bottom to top. In singing mode the lane of the part being sung shows 4
+// semitones more at both ends, so the sung line has room when the singer is below or above the part's notes
+function laneRange(v) {
+  const r = range[v];
+  return sing.on && !ed.on && v === sing.part ? [r[0] - 4, r[1] + 4] : r;
+}
 function laneYOf(v, midi) {
-  const { top, laneH, gap } = rollGeo, [lo, hi] = range[v];
+  const { top, laneH, gap } = rollGeo, [lo, hi] = laneRange(v);
   return top + v * (laneH + gap) + laneH - 12 - ((midi - lo) / Math.max(1, hi - lo)) * (laneH - 34 - lyPad());
 }
 function laneMidiAt(v, y) {
-  const { top, laneH, gap } = rollGeo, [lo, hi] = range[v];
+  const { top, laneH, gap } = rollGeo, [lo, hi] = laneRange(v);
   return lo + (top + v * (laneH + gap) + laneH - 12 - y) / (laneH - 34 - lyPad()) * Math.max(1, hi - lo);
 }
 function laneAt(y) {
@@ -2738,11 +1453,16 @@ function edHit(x, y) {
   let best = null;
   p.notes.forEach(n => {
     const x0 = G.X(edTL(n.t)), x1 = G.X(edTL(n.t + n.d, true)), yc = laneYOf(v, n.midi + p.shift);
-    if (!(x >= x0 - 2 && x <= Math.max(x1, x0 + 4) + 2 && Math.abs(y - yc) <= 6) || (best && best.joint)) return;
-    // where this note touches the next one: right at the crossing (joint) a drag moves the crossing, and the
-    // notes after it follow; just left of it only this note's length changes
-    const end = n.t + n.d, touching = p.notes.some(o => o !== n && Math.abs(o.t - end) < 1e-3), joint = touching && x >= x1 - 3;
-    best = { v, n, joint, edge: joint || x >= Math.max(x0 + 6, x1 - (touching ? 10 : 6)) };
+    // A note that touches the next one has two grips at its right end. Inside the note (its right half, up
+    // to 8 px): only this note's length changes. Just past its end, on the first 4 px of the next note
+    // (joint): the crossing moves and the notes after it follow. The grips are on different sides of the
+    // crossing, so even very short notes have both; the more specific grip wins over a note's body.
+    const end = n.t + n.d, touching = p.notes.some(o => o !== n && Math.abs(o.t - end) < 1e-3);
+    if (!(x >= x0 - 2 && x <= Math.max(x1, x0 + 4) + (touching ? 4 : 2) && Math.abs(y - yc) <= 6)) return;
+    const joint = touching && x >= x1;
+    const edge = joint || (touching ? x >= x1 - Math.min(8, (x1 - x0) / 2) : x >= Math.max(x0 + 6, x1 - 6));
+    const rank = joint ? 2 : edge ? 1 : 0;
+    if (!best || rank > best.rank) best = { v, n, joint, edge, rank };
   });
   return best || { v, n: null };
 }
@@ -2970,6 +1690,14 @@ function edBars(add) {
 
 // silence in every part at the playhead: later notes move later, a note sounding there is cut in two
 // (it stops for the pause and goes on after it); the bar it falls in becomes that much longer
+// where the song ends, in plain beats: the end line if one was put, otherwise the end of the last note
+function edEndPlain() {
+  const m = ed.model;
+  if (m.meta.end != null) return Math.min(m.meta.end, edTotal());
+  let e = 0;
+  m.parts.forEach(p => p.notes.forEach(n => { e = Math.max(e, n.t + n.d); }));
+  return e > 0.01 ? Math.min(e, edTotal()) : edTotal();
+}
 function edPlayheadPlain() { return edSnap(edPlain(locate(session ? currentBeat() : cursor).within)); }
 // Bars keep their length when time is inserted or removed: the music after the playhead moves across the
 // bar lines (notes crossing a bar line are tied) and bars are added or dropped at the end.
@@ -3013,6 +1741,7 @@ function edInsertPause(len) {
       });
       p.notes.push(...add);
     });
+    if (m.meta.end != null && m.meta.end > at + EPS) m.meta.end += len;
     const need = Math.max(edContentEnd(), oldP[oldP.length - 1] + len);
     while (m.barLen.reduce((a, b) => a + b, 0) < need - 1e-3) m.barLen.push(L);
     edPrefix();
@@ -3033,6 +1762,7 @@ function edRemovePause(len) {
     const oldP = ed.P.slice(), oldTotal = edTotal();
     edFixWords();
     m.parts.forEach(p => p.notes.forEach(n => { if (n.t >= end - EPS) n.t -= len; }));
+    if (m.meta.end != null && m.meta.end >= end - EPS) m.meta.end -= len;
     m.parts.forEach(p => (p.lyr || []).forEach(x => { if (x.t >= end - EPS) x.t -= len; else if (x.t + x.d > at + EPS) x.d = Math.max(0.125, x.d - Math.min(len, x.t + x.d - at)); }));
     edTrimEnd(oldTotal - len);
     edPrefix();
@@ -3257,6 +1987,13 @@ function drawEdit(g, G, X, top, laneH, gap, within) {
       g.beginPath(); g.roundRect(x - 2, laneYOf(jn.v, o.midi + jp.shift) - 6, Math.max(3, xe - x - 1) + 4, 12, 3); g.stroke();
     });
   }
+  {                                          // the end of the song: a line, and what comes after it greyed
+    const xe = Math.round(X(edTL(edEndPlain(), true))) + 0.5, yb = top + m.parts.length * (laneH + gap) - gap, bad = cssVar('--bad');
+    g.globalAlpha = 0.1; g.fillStyle = muted; g.fillRect(xe, top, Math.max(0, G.x1 - xe), yb - top);
+    g.globalAlpha = 1; g.strokeStyle = bad; g.lineWidth = 2; g.setLineDash([6, 4]);
+    g.beginPath(); g.moveTo(xe, top - 4); g.lineTo(xe, yb); g.stroke(); g.setLineDash([]);
+    g.fillStyle = bad; g.fillText(m.meta.end != null ? 'end' : 'end (last note)', xe + 5, yb - 5);
+  }
   if (rec.on && rec.samples.length) {        // what you are singing, over the part being recorded
     g.globalAlpha = 1; g.strokeStyle = cssVar('--accent'); g.lineWidth = 2.5; g.lineCap = 'round';
     let prev = null;
@@ -3279,6 +2016,7 @@ function drawEdit(g, G, X, top, laneH, gap, within) {
 function edShowState() {
   if (!ed.on) return;
   $('edUndo').disabled = !ed.undo.length; $('edRedo').disabled = !ed.redo.length;
+  $('edEndAuto').disabled = ed.model.meta.end == null;
   ['edDel', 'edUp', 'edDown'].forEach(id => { $(id).disabled = !ed.sel.size; });
   ['edCopy', 'edCut'].forEach(id => { $(id).disabled = !ed.sel.size && !ly.multi.length; });
   $('edPaste').disabled = ed.lastCopy === 'words' ? !(ly.clip && ly.clip.length) : !(ed.clip && ed.clip.length);
@@ -3309,7 +2047,7 @@ function setEditing(on) {
   $('editBody').hidden = !on;
   cv.style.touchAction = on ? 'none' : '';
   cv.style.cursor = on ? 'default' : '';
-  if (on) { edFromPiece(); ed.undo = []; ed.redo = []; edRanges(); edShowState(); draw(); }
+  if (on) { if (session) pausePlay(); setPass(); edFromPiece(); ed.undo = []; ed.redo = []; edRanges(); edShowState(); showPos(cursor); }
   else {
     ed.drag = null; ed.sel.clear();
     const keepOn = state.on.slice(), c = cursor;
@@ -3328,6 +2066,16 @@ $('edCopy').addEventListener('click', edCopy);
 $('edCut').addEventListener('click', edCut);
 $('edPaste').addEventListener('click', edPaste);
 $('edAddBar').addEventListener('click', () => edBars(true));
+$('edEndHere').addEventListener('click', () => {
+  const at = edPlayheadPlain();
+  if (at < 0.01) { $('edInfo').textContent = 'Put the playhead where the song should end first (click there), then press End here.'; return; }
+  edChange(() => { ed.model.meta.end = +at.toFixed(4); });
+  $('edInfo').textContent = 'The song now ends at the playhead (bar ' + (edBarAt(Math.max(0, at - 1e-3)) + 1) + '). The player and singing mode stop there; notes after the line are kept but not played.';
+});
+$('edEndAuto').addEventListener('click', () => {
+  edChange(() => { ed.model.meta.end = null; });
+  $('edInfo').textContent = 'The end line is gone: the song ends where its last note ends.';
+});
 $('edEvenBars').addEventListener('click', edEvenBars);
 $('edPause').addEventListener('click', () => edInsertPause(+$('edPauseLen').value));
 $('recBtn').addEventListener('click', () => { if (rec.on || rec.counting) recStop(); else recStart(); });
@@ -3717,7 +2465,7 @@ cv.addEventListener('pointermove', e => {
   e.stopImmediatePropagation();
   if (Math.abs(x - d.x0) > 3) d.moved = true;
   const list = lyList(d.v), sy = list[d.i], prev = list[d.i - 1], next = list[d.i + 1];
-  const t = plainOf(geo().B(x)), total = plainP[plainP.length - 1], minLen = 0.125;
+  const t = plainOf(geo().B(x)), total = plainP[plainP.length - 1], minLen = 0.0625;
   if (d.kind === 'end') {
     const limit = next ? next.t : total;
     d.nd = Math.min(limit, Math.max(sy.t + minLen, lySnap(d.v, t))) - sy.t;
@@ -3829,7 +2577,7 @@ function lyNudge(dir) {
   if (!ly.sel) return;
   const { v, i } = ly.sel, L = lyList(v), sy = L[i];
   if (!sy) return;
-  const prev = L[i - 1], next = L[i + 1], minLen = 0.125, total = plainP[plainP.length - 1];
+  const prev = L[i - 1], next = L[i + 1], minLen = 0.0625, total = plainP[plainP.length - 1];
   const joinP = prev && Math.abs(prev.t + prev.d - sy.t) < 1e-3, joinN = next && Math.abs(sy.t + sy.d - next.t) < 1e-3;
   const lo = prev ? (joinP ? prev.t + minLen : prev.t + prev.d) : 0, hi = next ? (joinN ? next.t + next.d - minLen : next.t) - sy.d : total - sy.d;
   const nt = Math.max(lo, Math.min(hi, sy.t + dir * ((ed.on && ed.grid) || 0.25))), dt = nt - sy.t;
@@ -3969,11 +2717,6 @@ $('apply').addEventListener('click', () => {
     msg.className = 'msg bad';
     msg.textContent = 'Could not apply: ' + (e && e.message ? e.message : 'the text is not valid JSON.');
   }
-});
-$('example').addEventListener('click', () => {
-  $('readMsg').className = 'msg';
-  $('readMsg').textContent = loadRaw(EXAMPLE, 'Example loaded');
-  ed.project = null; ed.dirty = false; $('projName').value = '';
 });
 
 /* ---------- singing mode ---------- */
@@ -4399,6 +3142,7 @@ $('singPart').addEventListener('change', e => {
   sing.ev = events.filter(x => x.v === sing.part).sort((a, b) => a.start - b.start);
   newTake(); $('singResult').hidden = true;
   if (sing.on) muteOwnPart();
+  draw();
 });
 $('singTol').addEventListener('change', () => { draw(); if (sing.done) singFinish(); });
 $('singOct').addEventListener('change', () => { newTake(); draw(); });
@@ -4409,8 +3153,10 @@ $('rAgain').addEventListener('click', () => { newTake(); $('singResult').hidden 
 function drawSinging(g, G, X, top, laneH, gap) {
   if (!sing.on || !sing.take.size || viewMode !== 'roll') return;
   const v = sing.part, y0 = top + v * (laneH + gap);
-  const [lo, hi] = range[v];
-  const Y = m => Math.max(y0 + 3, Math.min(y0 + laneH - 3, y0 + laneH - 12 - ((m - lo) / Math.max(1, hi - lo)) * (laneH - 34 - lyPad())));
+  const [lo, hi] = laneRange(v);
+  const yRaw = m => y0 + laneH - 12 - ((m - lo) / Math.max(1, hi - lo)) * (laneH - 34 - lyPad());
+  const Y = m => Math.max(y0 + 3, Math.min(y0 + laneH - 3, yRaw(m)));
+  const outside = m => { const y = yRaw(m); return y < y0 + 3 || y > y0 + laneH - 3; };   // further off than the lane can show
   const col = { on: cssVar('--good'), near: cssVar('--warn'), off: cssVar('--bad') };
   const pts = [...sing.take.values()].sort((a, b) => a.b - b.b);
   g.lineWidth = 2.5; g.lineCap = 'round'; g.globalAlpha = 1;
@@ -4419,8 +3165,10 @@ function drawSinging(g, G, X, top, laneH, gap) {
     if (a.disp == null || c.disp == null || c.b - a.b > 0.35) continue;
     const st = statusOf(c);
     g.strokeStyle = st && col[st] ? col[st] : cssVar('--muted');
+    g.setLineDash(outside(a.disp) && outside(c.disp) ? [2, 5] : []);     // dotted along the lane's edge: the real pitch is beyond it
     g.beginPath(); g.moveTo(X(a.w), Y(a.disp)); g.lineTo(X(c.w), Y(c.disp)); g.stroke();
   }
+  g.setLineDash([]);
   g.lineCap = 'butt';
   g.strokeStyle = cssVar('--accent'); g.lineWidth = 2;
   g.strokeRect(G.x0 + 1, y0 + 1, G.x1 - G.x0 - 2, laneH - 2);
@@ -4700,7 +3448,7 @@ async function apiJSON(prompt, files, signal) {
 
 function setReading(on) {
   $('read').disabled = on || !picked.length || !canRead(); $('stopRead').hidden = !on;
-  $('pick').disabled = on; $('example').disabled = on; $('apply').disabled = on;
+  $('pick').disabled = on; $('apply').disabled = on;
 }
 $('read').addEventListener('click', async () => {
   if (!canRead() || !picked.length) return;
@@ -4787,13 +3535,13 @@ $('keyForget').addEventListener('click', () => {
 /* ---------- user version and studio ---------- */
 // index.html is the user version: pick a song from the library, listen and sing. studio.html (or
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
-// The library is songs.json next to this page ({ songs: [score, …] }); EXAMPLE is used when it can't load.
+// The library is songs.json next to this page ({ songs: [score, …] }); no song is built into this file.
 var STUDIO = /[?&]studio\b/.test(location.search);
-const BUILD = '12 Nov 2026, 14:45';   // shown in the header, to see which version a browser has
+const BUILD = '14 Nov 2026, 16:10';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
 $('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
 if (STUDIO) document.title = 'Polyphony Studio';
-let library = [EXAMPLE];
+let library = [];
 function songKey(r) { return String(r && r.title || '').trim().toLowerCase(); }
 function showLibrary() {
   const box = $('songList'), cur = songKey(curRaw);
@@ -4833,11 +3581,18 @@ async function loadLibrary() {
       const h = await songsFile(false);
       if (h) { library = await readSongs(h); songsConnected = true; found = true; }
       else if (songsHandle) userConnectButton();
-    } catch (e) { /* no link yet: only the built-in song */ }
+    } catch (e) { /* no link to the file yet */ }
   }
-  if (!STUDIO && found && library.length) {
+  if (found && library.length) {                  // the song last open, or the first one
     const want = lsGet('pp.song'), i = library.findIndex(x => songKey(x) === want);
-    chooseSong(i >= 0 ? i : 0);                   // also when the built-in song has the same title: the saved one is newer
+    chooseSong(i >= 0 ? i : 0);
+  } else {
+    library = [];
+    $('title').textContent = 'No song loaded';
+    $('libMsg').className = 'msg bad';
+    $('libMsg').textContent = location.protocol === 'file:'
+      ? 'The songs are in songs.json, and a page opened from a folder can’t read that file by itself. Open the app from its web address' + (STUDIO ? ', or press “Open songs.json” here (Chrome or Edge), or press Save once to choose the file.' : ', or open the studio in Chrome or Edge and choose songs.json there.')
+      : 'The songs (songs.json) could not be loaded. Check the internet connection and reload the page.';
   }
   showLibrary();
 }
@@ -4885,6 +3640,228 @@ async function libAdd() {
   projMsg((i >= 0 ? 'Updated “' : 'Added “') + raw.title + '” (' + songs.length + ' songs). Replace songs.json in the app folder with the downloaded file, then commit and push.');
 }
 $('libAdd').addEventListener('click', libAdd);
+
+/* ---------- export: sheet music for piano (MusicXML) ---------- */
+// Writes the song as a score at sounding pitch: every voice on its own staff, except the basses, which share
+// one (stems up / down); each staff carries the words of its (first) voice. The file is
+// MusicXML, which notation programs (MuseScore, Sibelius, Dorico, Finale ...) open as real notes.
+const MX_DIV = 48;                                 // divisions per quarter note: 16ths, 32nds and triplets all fit
+const MX_TYPES = [[192, 'whole', 0], [144, 'half', 1], [96, 'half', 0], [72, 'quarter', 1], [48, 'quarter', 0], [36, 'eighth', 1], [24, 'eighth', 0], [18, '16th', 1], [12, '16th', 0], [6, '32nd', 0], [3, '64th', 0]];
+const MX_TRIPLET = [[64, 'half'], [32, 'quarter'], [16, 'eighth'], [8, '16th'], [4, '32nd']];
+const MX_SHARP = [['C', 0], ['C', 1], ['D', 0], ['D', 1], ['E', 0], ['F', 0], ['F', 1], ['G', 0], ['G', 1], ['A', 0], ['A', 1], ['B', 0]];
+const MX_FLAT = [['C', 0], ['D', -1], ['D', 0], ['E', -1], ['E', 0], ['F', 0], ['G', -1], ['G', 0], ['A', -1], ['A', 0], ['B', -1], ['B', 0]];
+function mxEsc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+// a length in divisions -> the written values it takes (largest first), each { d, type, dots, triplet }
+function mxSplit(d) {
+  const out = [];
+  let guard = 0;
+  while (d > 0 && guard++ < 40) {
+    const reg = d % 3 === 0 && MX_TYPES.find(x => x[0] <= d);
+    if (reg) { out.push({ d: reg[0], type: reg[1], dots: reg[2] }); d -= reg[0]; continue; }
+    const tri = MX_TRIPLET.find(x => x[0] <= d);
+    if (!tri) break;
+    out.push({ d: tri[0], type: tri[1], dots: 0, triplet: true }); d -= tri[0];
+  }
+  return out;
+}
+// the key signature that leaves the fewest accidentals (-5 flats .. 5 sharps), judged by how long each pitch sounds
+function mxKey() {
+  const w = Array(12).fill(0);
+  events.forEach(e => { w[((e.midi % 12) + 12) % 12] += e.dur; });
+  let best = 0, bestScore = -1;
+  [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5].forEach(f => {
+    const tonic = ((7 * f) % 12 + 12) % 12;
+    const sc = [0, 2, 4, 5, 7, 9, 11].reduce((a, k) => a + w[(tonic + k) % 12], 0);
+    if (sc > bestScore + 1e-6) { bestScore = sc; best = f; }
+  });
+  return best;
+}
+function pianoScoreXml() {
+  const P = piece, nB = Math.max(1, barStart.filter(x => x < END_TL - 1e-6).length), fifths = mxKey(), names = fifths < 0 ? MX_FLAT : MX_SHARP;
+  const keyAlter = {};                             // what the key signature does to each letter
+  'FCGDAEB'.split('').forEach((st, i) => { keyAlter[st] = fifths > i ? 1 : 0; });
+  'BEADGCF'.split('').forEach((st, i) => { if (-fifths > i) keyAlter[st] = -1; });
+  // lines of the score: every voice has its own staff, except the basses, which share one (stems up / down)
+  const groups = [];
+  let basses = null;
+  P.voices.forEach((v, vi) => {
+    if (/bass|bani|ბან/i.test(v.name)) { if (!basses) { basses = []; groups.push(basses); } basses.push(vi); }
+    else groups.push([vi]);
+  });
+  const avgOf = vi => { const ms = events.filter(e => e.v === vi).map(e => e.midi); return ms.length ? ms.reduce((x, y) => x + y, 0) / ms.length : 60; };
+  // a voice written an octave up in its own score (tenor clef, octaveShift -12) keeps that clef: treble with
+  // an 8 below; otherwise treble or bass, whichever its notes sit in
+  const clefFor = g => {
+    if (g.every(vi => P.voices[vi].shift - (P.transpose || 0) <= -12)) return '<sign>G</sign><line>2</line><clef-octave-change>-1</clef-octave-change>';
+    return g.reduce((x, vi) => x + avgOf(vi), 0) / g.length >= 57 ? '<sign>G</sign><line>2</line>' : '<sign>F</sign><line>4</line>';
+  };
+  const partName = g => g.length > 1 ? 'Bass' : P.voices[g[0]].name;
+  let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">\n<score-partwise version="4.0">\n'
+    + ' <work><work-title>' + mxEsc(P.title) + '</work-title></work>\n'
+    + ' <identification>' + (P.subtitle ? '<creator type="composer">' + mxEsc(P.subtitle) + '</creator>' : '') + '<encoding><software>Polyphony Studio</software></encoding></identification>\n'
+    + ' <part-list>' + groups.map((g, gi) => '<score-part id="P' + (gi + 1) + '"><part-name>' + mxEsc(partName(g)) + '</part-name></score-part>').join('') + '</part-list>\n';
+  groups.forEach((g, gi) => {
+    xml += ' <part id="P' + (gi + 1) + '">\n';
+    const tiedIn = g.map(() => null);                // pitch tied over from the bar before, per voice of this staff
+    let lastTime = '';
+    for (let bi = 0; bi < nB; bi++) {
+      const len = lenOf(P.voices[0].bars[bi]), barDiv = Math.max(MX_DIV / 4, Math.round(len * MX_DIV));
+      const whole = Math.abs(len - Math.round(len)) < 1e-3, time = whole ? Math.round(len) + '/4' : Math.round(len * 2) + '/8';
+      xml += '  <measure number="' + (bi + 1) + '">\n';
+      if (bi === 0 || time !== lastTime) {
+        xml += '   <attributes>' + (bi === 0 ? '<divisions>' + MX_DIV + '</divisions><key><fifths>' + fifths + '</fifths></key>' : '')
+          + '<time><beats>' + time.split('/')[0] + '</beats><beat-type>' + time.split('/')[1] + '</beat-type></time>'
+          + (bi === 0 ? '<clef>' + clefFor(g) + '</clef>' : '') + '</attributes>\n';
+        lastTime = time;
+      }
+      if (bi === 0 && gi === 0) xml += '   <direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>' + P.tempo + '</per-minute></metronome></direction-type><sound tempo="' + P.tempo + '"/></direction>\n';
+      g.forEach((vi, pos) => {
+        const v = P.voices[vi], bar = (v.bars[bi] || []).slice().sort((x, y) => x.off - y.off), acc = {};
+        const tail = '<voice>' + (pos + 1) + '</voice>', stem = g.length > 1 ? '<stem>' + (pos === 0 ? 'up' : 'down') + '</stem>' : '';
+        const rest = d => {
+          if (d <= 0) return;
+          if (d === barDiv) { xml += '   <note><rest measure="yes"/><duration>' + d + '</duration>' + tail + '</note>\n'; return; }
+          mxSplit(d).forEach(pc => {
+            xml += '   <note><rest/><duration>' + pc.d + '</duration>' + tail + '<type>' + pc.type + '</type>' + '<dot/>'.repeat(pc.dots)
+              + (pc.triplet ? '<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>' : '') + '</note>\n';
+          });
+        };
+        if (pos > 0) xml += '   <backup><duration>' + barDiv + '</duration></backup>\n';
+        let cur = 0, tieNext = null;
+        bar.forEach(n => {
+          const s0 = Math.min(barDiv, Math.round(n.off * MX_DIV)), e0 = Math.min(barDiv, Math.round((n.off + n.dur) * MX_DIV));
+          if (e0 <= s0 || s0 < cur) return;
+          if (n.rest) return;                        // rests come out of the gaps between the notes
+          rest(s0 - cur);
+          const midi = n.midi + v.shift, [step, alter] = names[((midi % 12) + 12) % 12], oct = Math.floor(midi / 12) - 1;
+          const pieces = mxSplit(e0 - s0), cont = cur === 0 && s0 === 0 && tiedIn[pos] === midi;   // carries on a tied note
+          const fermata = P.fermata && P.fermata.has(bi + 1) && n.off + n.dur >= len - 0.01;
+          const L = v.lyr || [], wi = pos === 0 && !cont ? L.findIndex(w => Math.abs(w.t - (plainP[bi] + n.off)) < 0.02) : -1;   // the staff's first voice carries the words
+          pieces.forEach((pc, k) => {
+            const stop = k > 0 || cont, start = k < pieces.length - 1 || (n.tie && k === pieces.length - 1 && bi < nB - 1);
+            const key = step + oct, had = key in acc ? acc[key] : keyAlter[step];
+            let accEl = '';
+            if (alter !== had && !stop) accEl = '<accidental>' + (alter > 0 ? 'sharp' : alter < 0 ? 'flat' : 'natural') + '</accidental>';
+            acc[key] = alter;
+            let lyric = '';
+            if (wi >= 0 && k === 0) {
+              const t = L[wi].text.trim(), goes = /-$/.test(t), came = wi > 0 && /-\s*$/.test(L[wi - 1].text);
+              const word = t.replace(/-+$/, '');
+              if (word) lyric = '<lyric number="1"><syllabic>' + (goes ? (came ? 'middle' : 'begin') : (came ? 'end' : 'single')) + '</syllabic><text>' + mxEsc(word) + '</text></lyric>';
+            }
+            const nots = (stop ? '<tied type="stop"/>' : '') + (start ? '<tied type="start"/>' : '') + (fermata && k === pieces.length - 1 ? '<fermata type="upright"/>' : '');
+            xml += '   <note><pitch><step>' + step + '</step>' + (alter ? '<alter>' + alter + '</alter>' : '') + '<octave>' + oct + '</octave></pitch><duration>' + pc.d + '</duration>'
+              + (stop ? '<tie type="stop"/>' : '') + (start ? '<tie type="start"/>' : '') + tail + '<type>' + pc.type + '</type>' + '<dot/>'.repeat(pc.dots) + accEl
+              + (pc.triplet ? '<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>' : '')
+              + stem + (nots ? '<notations>' + nots + '</notations>' : '') + lyric + '</note>\n';
+          });
+          cur = s0 + pieces.reduce((x, pc) => x + pc.d, 0);
+          tieNext = n.tie && e0 >= barDiv ? midi : null;
+        });
+        rest(barDiv - cur);
+        tiedIn[pos] = tieNext;
+      });
+      if (bi === nB - 1) xml += '   <barline location="right"><bar-style>light-heavy</bar-style></barline>\n';
+      xml += '  </measure>\n';
+    }
+    xml += ' </part>\n';
+  });
+  return xml + '</score-partwise>\n';
+}
+$('pianoExport').addEventListener('click', () => {
+  if (!piece || piece.audio) return;
+  let xml;
+  try { xml = pianoScoreXml(); } catch (e) { projMsg('The piano score could not be made: ' + (e && e.message || e), true); return; }
+  const name = exportName();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([xml], { type: 'application/vnd.recordare.musicxml+xml' }));
+  a.download = name + ' (piano).musicxml'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  projMsg('Downloaded “' + name + ' (piano).musicxml”. Open it in MuseScore (free) or other notation software to see and print the notes.');
+});
+
+/* ---------- export: the piano score as a PDF ---------- */
+// The MusicXML from pianoScoreXml() is engraved by OpenSheetMusicDisplay (1.9.0, loaded from a CDN when the
+// button is first pressed) onto A4-shaped canvases, about 2200 px wide; each canvas becomes a JPEG and the
+// JPEGs become the pages of a PDF written here (pdfFromJpegs). Pictures, not text: that way the words come
+// out in any alphabet without putting a font into the file.
+const OSMD_URLS = ['https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.0/build/opensheetmusicdisplay.min.js', 'https://unpkg.com/opensheetmusicdisplay@1.9.0/build/opensheetmusicdisplay.min.js'];
+// pages: [{ jpeg: Uint8Array, w, h }] (pixels) -> the bytes of a PDF with one A4 page per picture
+function pdfFromJpegs(pages, title) {
+  const enc = new TextEncoder(), parts = [], offs = [];
+  let len = 0;
+  const put = x => { const b = typeof x === 'string' ? enc.encode(x) : x; parts.push(b); len += b.length; };
+  const obj = (n, body) => { offs[n] = len; put(n + ' 0 obj\n'); body(); put('\nendobj\n'); };
+  const PW = 595.28, PH = 841.89, n = pages.length, info = 3 + 3 * n;
+  put('%PDF-1.4\n%âãÏÓ\n');
+  obj(1, () => put('<< /Type /Catalog /Pages 2 0 R >>'));
+  obj(2, () => put('<< /Type /Pages /Count ' + n + ' /Kids [' + pages.map((_, i) => (3 + 3 * i) + ' 0 R').join(' ') + '] >>'));
+  pages.forEach((p, i) => {
+    const pg = 3 + 3 * i, draw = 'q ' + PW + ' 0 0 ' + PH + ' 0 0 cm /Im0 Do Q';
+    obj(pg, () => put('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PW + ' ' + PH + '] /Resources << /XObject << /Im0 ' + (pg + 2) + ' 0 R >> >> /Contents ' + (pg + 1) + ' 0 R >>'));
+    obj(pg + 1, () => put('<< /Length ' + draw.length + ' >>\nstream\n' + draw + '\nendstream'));
+    obj(pg + 2, () => { put('<< /Type /XObject /Subtype /Image /Width ' + p.w + ' /Height ' + p.h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + p.jpeg.length + ' >>\nstream\n'); put(p.jpeg); put('\nendstream'); });
+  });
+  let hex = 'FEFF';                                 // the title as UTF-16, so any alphabet works
+  for (const ch of String(title || '')) { const c = ch.codePointAt(0); if (c < 0x10000) hex += c.toString(16).padStart(4, '0'); }
+  obj(info, () => put('<< /Title <' + hex.toUpperCase() + '> /Producer (Polyphony Studio) >>'));
+  const xref = len;
+  put('xref\n0 ' + (info + 1) + '\n0000000000 65535 f \n');
+  for (let k = 1; k <= info; k++) put(String(offs[k]).padStart(10, '0') + ' 00000 n \n');
+  put('trailer\n<< /Size ' + (info + 1) + ' /Root 1 0 R /Info ' + info + ' 0 R >>\nstartxref\n' + xref + '\n%%EOF\n');
+  const out = new Uint8Array(len);
+  let o = 0;
+  parts.forEach(b => { out.set(b, o); o += b.length; });
+  return out;
+}
+function exportName() { return String(piece.title || 'song').replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'song'; }
+async function pianoPdf() {
+  if (!piece || piece.audio) return;
+  const btn = $('pianoPdf');
+  let box = null;
+  btn.disabled = true;
+  try {
+    projMsg('Making the PDF: loading the note engraver…');
+    for (const u of OSMD_URLS) { if (window.opensheetmusicdisplay) break; try { await loadScript(u); } catch (e) { /* try the next copy */ } }
+    if (!window.opensheetmusicdisplay) throw new Error('the note engraver could not be loaded (it needs the internet)');
+    projMsg('Making the PDF: drawing the notes…');
+    await new Promise(r => setTimeout(r, 30));      // let the message show before the heavy work
+    // the engraver lays a page out by the width of the box it draws into (1100 px = a normal note size on A4);
+    // the box is sized so that, with this screen's pixel density, the page comes out about 2200 px wide
+    const dpr = window.devicePixelRatio || 1, cw = Math.round(2200 / dpr);
+    box = document.createElement('div');
+    box.style.cssText = 'position:fixed;left:-30000px;top:0;width:' + cw + 'px;background:#fff';
+    document.body.appendChild(box);
+    const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(box, { backend: 'canvas', autoResize: false, pageFormat: 'A4_P', pageBackgroundColor: '#FFFFFF',
+      drawTitle: true, drawSubtitle: false, drawComposer: true, drawPartNames: true, drawPartAbbreviations: false, disableCursor: true });
+    await osmd.load(pianoScoreXml());
+    osmd.zoom = cw / 1100;
+    osmd.render();
+    const pages = [];
+    box.querySelectorAll('canvas').forEach(c => {
+      if (!c.width || !c.height) return;
+      const k = document.createElement('canvas');
+      k.width = c.width; k.height = c.height;
+      const g = k.getContext('2d');
+      g.fillStyle = '#fff'; g.fillRect(0, 0, k.width, k.height); g.drawImage(c, 0, 0);
+      const bin = atob(k.toDataURL('image/jpeg', 0.9).split(',')[1]), bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      pages.push({ jpeg: bytes, w: k.width, h: k.height });
+    });
+    if (!pages.length) throw new Error('no pages were drawn');
+    const name = exportName(), a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([pdfFromJpegs(pages, piece.title)], { type: 'application/pdf' }));
+    a.download = name + ' (piano).pdf'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    projMsg('Downloaded “' + name + ' (piano).pdf” (' + pages.length + (pages.length === 1 ? ' page).' : ' pages).'));
+  } catch (e) {
+    projMsg('The PDF could not be made: ' + (e && e.message || e), true);
+  } finally {
+    if (box) box.remove();
+    btn.disabled = false;
+  }
+}
+$('pianoPdf').addEventListener('click', pianoPdf);
 
 /* ---------- saving songs (studio) ---------- */
 // Save writes the current song into songs.json in the app folder (File System Access API, Chrome/Edge):
@@ -4938,6 +3915,7 @@ async function songSave() {
   if (!STUDIO) return;
   const raw = projCurrentRaw();
   if (!raw) return;
+  if (songKey(raw) === songKey(BLANK)) { projMsg('There is no song to save yet: open one from the list, or read a score first.', true); return; }
   if (!window.showOpenFilePicker) { await libAdd(); ed.dirty = false; songKeyLoaded = songKey(raw); return; }
   let h;
   try {
@@ -4978,10 +3956,10 @@ document.addEventListener('keydown', e => {
 });
 
 
-loadRaw(EXAMPLE, 'Example');
+loadRaw(BLANK, 'Loading');
 if (lsGet('pp.piano')) setPiano(true);
 $('readMsg').textContent = '';
-songKeyLoaded = songKey(EXAMPLE);
+songKeyLoaded = null;
 showLibrary();
 loadLibrary().then(() => studioLibrary(false));
 </script>
