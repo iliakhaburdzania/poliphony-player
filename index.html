@@ -191,12 +191,46 @@ body.studio .user-only { display: none !important; }
 .keyrow { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
 #apiKey { font: inherit; font-family: var(--font-mono); font-size: 13px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; flex: 1 1 220px; min-width: 0; }
 @media (prefers-reduced-motion: reduce) { .meter .dot { transition: none; } }
+/* the bar that follows you down the page on a phone: Play/Pause and where you are */
+.minibar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; align-items: center; gap: 12px;
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -6px 18px rgba(0, 0, 0, .12); }
+.minibar .primary { min-width: 0; flex: 0 0 auto; padding: 10px 22px; }
+.minibar .mstat { font-family: var(--font-mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.minibar .mtitle { font-weight: 600; color: var(--ink); font-family: var(--font-body); }
+@media (min-width: 761px) { .minibar { display: none !important; } }
+@media (max-width: 760px) {
+  body { padding-top: 16px; padding-bottom: 96px; }
+  main { gap: 12px; }
+  .panel { padding: 12px; }
+  .roll { padding: 8px; }
+  .transport { gap: 12px 16px; }
+  .transport .ctl { flex: 1 1 auto; }
+  .transport .ctl input[type=range] { flex: 1; min-width: 90px; }
+  .songlist { display: grid; grid-template-columns: 1fr; }
+  .song { width: 100%; }
+}
 @media (max-width: 560px) {
   .liverow { grid-template-columns: 72px 72px; }
   .meterbox { grid-column: 1 / -1; }
-  .voice { grid-template-columns: 1fr auto; }
+  .voice { grid-template-columns: 1fr auto auto; gap: 8px 10px; }
   .voice .vol { grid-column: 1 / -1; }
+  .voice .lng { display: none; }
   .status { margin-left: 0; width: 100%; }
+  .primary { min-width: 0; flex: 1 1 auto; }
+  .transport #playAll { flex: 1 1 100%; }
+  .rolltools { justify-content: space-between; }
+}
+/* fingers instead of a mouse: bigger buttons and sliders, and text fields that don't make the phone zoom in */
+@media (pointer: coarse) {
+  .small, .primary, select, .song { min-height: 44px; }
+  .small { padding: 8px 14px; }
+  .seg .small, .keybtn { min-width: 44px; }
+  .chk { min-height: 40px; }
+  .chk input { width: 20px; height: 20px; }
+  input[type=range] { height: 32px; }
+  select, input[type=text], input[type=password], textarea, #lyText, #projName, #apiKey { font-size: 16px; }
+  .resx { font-size: 30px; padding: 6px 12px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -433,6 +467,10 @@ body.studio .user-only { display: none !important; }
   <p class="note">Singing mode needs your microphone. If the browser doesn't ask for it when you open this file directly, open a terminal in the file's folder, run <code>python3 -m http.server</code>, and open <code>http://localhost:8000/</code>.</p>
   <p class="note" id="foot">The example was transcribed from the score image. A picture you upload is read by Claude and can contain mistakes, so listen once with the notation next to you and fix any wrong note above.</p>
 </main>
+<div class="minibar" id="miniBar" hidden aria-label="Playback">
+  <button class="primary" id="miniPlay" type="button">Play</button>
+  <span class="mstat"><span class="mtitle" id="miniTitle"></span> <span id="miniStat"></span></span>
+</div>
 
 <script>
 /*DATA*/
@@ -638,7 +676,7 @@ function buildPiece(raw) {
     const tx = document.createElement('span'); tx.textContent = v.name;
     nm.append(sw, tx);
     const hear = document.createElement('button'); hear.className = 'small toggle'; hear.type = 'button'; hear.textContent = 'Hear'; hear.dataset.hear = vi; hear.setAttribute('aria-pressed', 'true');
-    const only = document.createElement('button'); only.className = 'small'; only.type = 'button'; only.textContent = '▶ Only this voice'; only.dataset.only = vi;
+    const only = document.createElement('button'); only.className = 'small'; only.type = 'button'; only.append('▶ Only'); const lng = document.createElement('span'); lng.className = 'lng'; lng.textContent = ' this voice'; only.appendChild(lng); only.dataset.only = vi;
     const vol = document.createElement('div'); vol.className = 'vol';
     const lab = document.createElement('span'); lab.textContent = 'Vol';
     const inp = document.createElement('input'); inp.type = 'range'; inp.min = 0; inp.max = 100; inp.value = 80; inp.id = 'vol' + vi; inp.setAttribute('aria-label', v.name + ' volume');
@@ -2365,7 +2403,21 @@ function scrubEnd() {
 function inScrubZone(x, y) {        // editing mode: the bar-number strip, or within a few pixels of the playhead
   return y < rollGeo.top - 2 || Math.abs(x - geo().X(locate(cursor).within)) <= 6;
 }
-cv.addEventListener('pointerdown', e => { if (!piece || ed.on || e.button > 0) return; scrubStart(e); scrub.x0 = e.clientX; scrub.y0 = e.clientY; scrub.moved = false; });
+// On a touch screen a finger on the score usually means scrolling it sideways, so nothing happens until it
+// lifts: a tap (moved less than 10 px, not taken over by scrolling) moves the playhead there.
+let tapScore = null;
+cv.addEventListener('pointerdown', e => {
+  if (!piece || ed.on || e.button > 0) return;
+  if (e.pointerType === 'touch') { tapScore = { id: e.pointerId, x: e.clientX, y: e.clientY }; return; }
+  scrubStart(e); scrub.x0 = e.clientX; scrub.y0 = e.clientY; scrub.moved = false;
+});
+cv.addEventListener('pointerup', e => {
+  const t = tapScore;
+  tapScore = null;
+  if (!t || t.id !== e.pointerId || ed.on || Math.hypot(e.clientX - t.x, e.clientY - t.y) > 10) return;
+  seekTo(scrubPos(e));
+});
+cv.addEventListener('pointercancel', () => { tapScore = null; });
 cv.addEventListener('pointermove', e => { if (scrub) { if (Math.abs(e.clientX - (scrub.x0 || 0)) > 4) scrub.moved = true; showPos(scrubPos(e)); } });
 cv.addEventListener('pointerup', scrubEnd);
 cv.addEventListener('pointercancel', scrubEnd);
@@ -2376,6 +2428,22 @@ $('lyrics').addEventListener('click', e => {
   seekTo(p * (PASS + GAP) + barStart[+b.dataset.bar]);
 });
 window.addEventListener('resize', () => draw());
+// Phone: when the playback controls have scrolled out of sight, a bar at the bottom of the screen keeps
+// Play/Pause and the position at hand. It copies the main button and status line, so it never disagrees.
+(() => {
+  const bar = $('miniBar'), tr = document.querySelector('.transport');
+  const copy = () => {
+    $('miniPlay').textContent = $('playAll').textContent;
+    $('miniStat').textContent = '\u00B7 ' + $('status').textContent + ' \u00B7 ' + $('seekOut').textContent.split(' / ')[0];
+    $('miniTitle').textContent = $('title').textContent;
+  };
+  new MutationObserver(copy).observe($('playAll'), { childList: true, characterData: true, subtree: true });
+  new MutationObserver(copy).observe($('status'), { childList: true, characterData: true, subtree: true });
+  new MutationObserver(copy).observe($('title'), { childList: true, characterData: true, subtree: true });
+  $('miniPlay').addEventListener('click', () => togglePlay());
+  if ('IntersectionObserver' in window && tr) new IntersectionObserver(es => { bar.hidden = es[0].isIntersecting || !piece; copy(); }, { threshold: 0.05 }).observe(tr);
+  copy();
+})();
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => draw()); } catch (e) { /* older browsers */ }
 new MutationObserver(() => draw()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => draw());
@@ -2409,7 +2477,7 @@ function lySnap(v, t) {
   p.notes.forEach(n => [n.t, n.t + n.d].forEach(e => { const dist = Math.abs(e - t); if (dist <= tol && dist <= Math.abs(best - t) + 1e-6) best = e; }));
   return best;
 }
-function lyPad() { return piece && !piece.audio && piece.voices.some(v => v.lyr && v.lyr.length) ? 20 : 0; }   // extra lane room for words
+function lyPad() { return piece && !piece.audio && piece.voices.some(v => v.lyr && v.lyr.length) ? 34 : 0; }   // extra lane room for words (and the tags of words too long for their box)
 function lyPerBar(list, P) {
   const out = Array(Math.max(0, P.length - 1)).fill('');
   list.forEach(x => {
@@ -2707,7 +2775,7 @@ function drawLyrics(g, G, X) {
   const now = session ? plainOf(locate(currentBeat()).within) : -1, d = ly.drag, open = !$('lyEdit').hidden;
   g.textBaseline = 'alphabetic';
   piece.voices.forEach((v, vi) => {
-    const L = v.lyr || [];
+    const L = v.lyr || [], texts = [];
     L.forEach((sy, i) => {
       let t = sy.t, dd = sy.d;
       if (d && d.v === vi && d.i === i) { if (d.kind === 'end') dd = d.nd; else t = d.nt; }
@@ -2729,10 +2797,28 @@ function drawLyrics(g, G, X) {
         g.globalAlpha = sel ? 0.9 : 0.5; g.fillStyle = sel ? acc : muted;
         g.fillRect(x0 + bw - 4, yb - 8.5, 1.5, 8); g.globalAlpha = 1;
       }
-      g.font = (on || sel ? '700 ' : '600 ') + '12px ' + cssVar('--font-body');
-      g.save(); g.beginPath(); g.rect(x0 + 2, yb - 13, Math.max(0, bw - (STUDIO ? 8 : 3)), 18); g.clip();
-      g.fillStyle = on || sel ? acc : ink; g.fillText(text, x0 + 4.5, yb);
-      g.restore();
+      texts.push({ text, x0, yb, room: Math.max(0, bw - (STUDIO ? 9 : 6)), hi: on || sel });
+    });
+    // the words, after all the boxes of this part so that nothing covers them. A word that doesn't fit its
+    // box is first set smaller (down to 9 px); if it still doesn't fit, it is shown whole in a tag just
+    // above its box, starting where the word starts, one row higher still if the tag before is in the way
+    const ends = [-1e9, -1e9];
+    texts.forEach(w => {
+      const fam = cssVar('--font-body'), wt = w.hi ? '700 ' : '600 ';
+      let size = 12;
+      g.font = wt + size + 'px ' + fam;
+      while (size > 9 && g.measureText(w.text).width > w.room) { size--; g.font = wt + size + 'px ' + fam; }
+      g.fillStyle = w.hi ? acc : ink;
+      if (g.measureText(w.text).width <= w.room) { g.fillText(w.text, w.x0 + 4.5, w.yb - (12 - size) / 2); return; }
+      g.font = wt + '11px ' + fam;
+      const tw = g.measureText(w.text).width + 8;
+      const lv = w.x0 >= ends[0] + 2 ? 0 : w.x0 >= ends[1] + 2 ? 1 : (ends[0] <= ends[1] ? 0 : 1);
+      ends[lv] = w.x0 + tw;
+      const y = w.yb - 16 - 14 * lv;
+      g.fillStyle = bg; g.strokeStyle = w.hi ? acc : line; g.lineWidth = 1;
+      g.beginPath(); g.roundRect(w.x0 + 0.5, y - 11, tw, 14, 3); g.fill(); g.stroke();
+      g.beginPath(); g.moveTo(w.x0 + 3.5, y + 3); g.lineTo(w.x0 + 3.5, w.yb - 12.5); g.stroke();   // to its box
+      g.fillStyle = w.hi ? acc : ink; g.fillText(w.text, w.x0 + 4.5, y);
     });
   });
   g.globalAlpha = 1; g.font = '11px ' + cssVar('--font-mono');
@@ -3703,7 +3789,7 @@ $('keyForget').addEventListener('click', () => {
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); no song is built into this file.
 var STUDIO = /[?&]studio\b/.test(location.search);
-const BUILD = '15 Nov 2026, 13:30';   // shown in the header, to see which version a browser has
+const BUILD = '15 Nov 2026, 19:10';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
 $('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
 if (STUDIO) document.title = 'Polyphony Studio';
