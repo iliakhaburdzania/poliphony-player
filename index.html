@@ -165,12 +165,29 @@ body.studio .user-only { display: none !important; }
 .meter .dot { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--muted); transition: left .08s linear; }
 .meter .dot.on { background: var(--good); } .meter .dot.near { background: var(--warn); } .meter .dot.off { background: var(--bad); }
 .scale { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
-.result { display: grid; grid-template-columns: auto 1fr; gap: 6px 20px; align-items: center; border-top: 1px solid var(--line); padding-top: 14px; }
-.result .big { font-family: var(--font-mono); font-size: 52px; line-height: 1; font-weight: 500; color: var(--accent); font-variant-numeric: tabular-nums; }
-.result .big small { font-size: 16px; color: var(--muted); margin-left: 2px; }
-.result .grade { margin: 0; font-weight: 600; font-size: 17px; }
-.result .rtext { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.result > .actions { grid-column: 1 / -1; }
+.respop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(8, 14, 18, .58); }
+.respop[hidden] { display: none; }
+#rConf { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.rescard { position: relative; width: min(440px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 16px; padding: 28px 22px 20px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, .4); animation: respop .4s cubic-bezier(.2, 1.4, .4, 1); }
+@keyframes respop { from { transform: scale(.8) translateY(14px); opacity: 0; } }
+.resx { position: absolute; top: 8px; right: 10px; border: 0; background: none; color: var(--muted); font-size: 24px; line-height: 1; padding: 4px 8px; }
+.ring { position: relative; width: 156px; height: 156px; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 9; }
+.ring .trk { stroke: var(--line); }
+.ring .arc { stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 326.73; stroke-dashoffset: 326.73; }
+.ring .big { position: absolute; inset: 0; display: flex; align-items: baseline; justify-content: center; padding-top: 50px; font-family: var(--font-mono); font-size: 50px; line-height: 1; font-weight: 500; font-variant-numeric: tabular-nums; }
+.ring .big small { font-size: 14px; color: var(--muted); margin-left: 2px; }
+.respop.great .ring .arc, .respop.great .ring .big { stroke: var(--good); color: var(--good); }
+.respop.low .ring .arc { stroke: var(--muted); }
+.stars { margin: 0; font-size: 28px; letter-spacing: 5px; line-height: 1; min-height: 28px; color: var(--line); }
+.stars .on { color: var(--warn); display: inline-block; animation: starin .45s cubic-bezier(.2, 1.6, .4, 1) both; }
+@keyframes starin { from { transform: scale(0) rotate(-40deg); opacity: 0; } }
+.rescard .grade { margin: 0; font-weight: 700; font-size: 22px; }
+.rbest { margin: 0; font-size: 13px; color: var(--muted); }
+.rbest.new { background: var(--good); color: #fff; border-radius: 999px; padding: 3px 14px; font-weight: 600; animation: starin .5s .9s cubic-bezier(.2, 1.6, .4, 1) both; }
+.rescard .actions { justify-content: center; }
+@media (prefers-reduced-motion: reduce) { .rescard, .stars .on, .rbest.new { animation: none; } }
 .keyrow { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
 #apiKey { font: inherit; font-family: var(--font-mono); font-size: 13px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; flex: 1 1 220px; min-width: 0; }
 @media (prefers-reduced-motion: reduce) { .meter .dot { transition: none; } }
@@ -232,6 +249,8 @@ body.studio .user-only { display: none !important; }
       <div class="ctl"><label for="singTol">Strictness</label>
         <select id="singTol"><option value="75">Easy (&plusmn;75&cent;)</option><option value="50" selected>Normal (&plusmn;50&cent;)</option><option value="30">Strict (&plusmn;30&cent;)</option></select></div>
       <label class="chk"><input type="checkbox" id="singOct" checked> Any octave</label>
+      <label class="chk" title="Tick this only when the music comes from speakers: the microphone then filters the music out, which also makes your pitch less exact. Leave it off with headphones."><input type="checkbox" id="singSpk"> Speakers (no headphones)</label>
+      <label class="chk" title="Before playing, sound your part's next note and count in one bar, like Record in the studio"><input type="checkbox" id="singCount" checked> Starting note and count-in</label>
     </div>
     <div id="singBody" hidden>
       <div class="live" aria-live="off">
@@ -246,17 +265,24 @@ body.studio .user-only { display: none !important; }
         <b class="lvs" id="lvS">Sing to see your pitch, or press Play (Space)</b>
       </div>
       <p class="note" id="pdInfo"></p>
-      <p class="note">Wear headphones so the microphone hears only you. Your part is muted; switch on its Hear button to sing along with it. The line on your part shows your voice: green on pitch, amber close, red off.</p>
+      <p class="note">Wear headphones so the microphone hears only you (without them, tick Speakers above). Your part is muted; switch on its Hear button to sing along with it. The line on your part shows your voice: green on pitch, amber close, red off.</p>
       <div class="actions"><button class="small" id="singFinish" type="button">Finish and score</button><p class="msg" id="singMsg"></p></div>
     </div>
-    <div class="result" id="singResult" hidden>
-      <div class="big"><span id="rScore">0</span><small>/100</small></div>
-      <div class="rtext">
+    <div class="respop" id="singResult" hidden role="dialog" aria-modal="true" aria-labelledby="rGrade">
+      <canvas id="rConf" aria-hidden="true"></canvas>
+      <div class="rescard">
+        <button class="resx" id="rClose" type="button" aria-label="Close">&times;</button>
+        <div class="ring">
+          <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="trk" cx="60" cy="60" r="52"/><circle class="arc" id="rArc" cx="60" cy="60" r="52"/></svg>
+          <div class="big"><span id="rScore">0</span><small>/100</small></div>
+        </div>
+        <p class="stars" id="rStars" aria-hidden="true"></p>
         <p class="grade" id="rGrade"></p>
+        <p class="rbest" id="rBest"></p>
         <p class="note" id="rStats"></p>
         <div class="actions" id="rBars"></div>
+        <div class="actions"><button class="primary" id="rAgain" type="button">Sing again</button><button class="small" id="rClose2" type="button">Close</button></div>
       </div>
-      <div class="actions"><button class="primary" id="rAgain" type="button">Sing again</button><span class="note" id="rBest"></span></div>
     </div>
   </section>
 
@@ -2243,12 +2269,49 @@ $('keyOut2').addEventListener('dblclick', () => { const sg = library.find(x => s
 async function togglePlay() {
   if (!piece) return;
   if (session) { pausePlay(); return; }
+  if (singCount.timer) { singCountStop(); return; }   // pressed again during the count-in: cancel it
   if (sing.on) {
     if (!(await ensureMic())) return;
     startListening();
     if (sing.done || cursor < 0.05) { newTake(); $('singResult').hidden = true; }
+    if ($('singCount').checked && singCountIn()) return;
   }
   startPlay();
+}
+// Singing mode, before the music starts: your part's next note sounds (the one at the playhead, or the
+// first one after it) for the first half of a one-bar count-in with clicks, at least 2 beats, as Record does in the
+// studio. Then playback starts from the playhead. Space or Play during the count-in cancels it.
+const singCount = { timer: 0, osc: null };
+function singCountIn() {
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === 'suspended') ctx.resume();
+  const L = locate(cursor), w = L.within, from = cursor;
+  const e = targetAt(w) || sing.ev.find(x => x.start >= w - 1e-6 && x.start < PASS - 1e-6);
+  const bd = 60 / +$('tempo').value, n = Math.max(2, Math.round(piece.audio ? 4 : lenOf(piece.voices[0].bars[L.b]) || 4));
+  const T0 = ctx.currentTime + 0.1, T1 = T0 + n * bd;
+  for (let i = 0; i < n; i++) recClick(T0 + i * bd, i === 0);
+  if (e) {                                         // the starting note, held through the count-in
+    const o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+    o.type = 'triangle'; o.frequency.value = 440 * Math.pow(2, (e.midi - 69) / 12);
+    lp.type = 'lowpass'; lp.frequency.value = 1800;
+    const Th = T0 + (T1 - T0) / 2;                 // it sounds for the first half of the count-in, then only the clicks
+    g.gain.setValueAtTime(0.0001, T0); g.gain.exponentialRampToValueAtTime(0.2, T0 + 0.06);
+    g.gain.setValueAtTime(0.2, Math.max(T0 + 0.08, Th - 0.2)); g.gain.exponentialRampToValueAtTime(0.0001, Th);
+    o.connect(lp); lp.connect(g); g.connect(ctx.destination); o.start(T0); o.stop(Th + 0.02);
+    singCount.osc = o;
+  }
+  $('lvS').textContent = e ? 'Your note: ' + noteName(e.midi) + ' \u00B7 counting in\u2026' : 'Counting in\u2026';
+  $('playAll').textContent = 'Cancel';
+  singCount.timer = setTimeout(() => {
+    singCount.timer = 0; singCount.osc = null;
+    startPlay(from);
+  }, Math.max(0, (T1 - 0.15 - ctx.currentTime) * 1000));
+  return true;
+}
+function singCountStop() {
+  clearTimeout(singCount.timer); singCount.timer = 0;
+  if (singCount.osc) { try { singCount.osc.stop(); } catch (e) { /* already stopped */ } singCount.osc = null; }
+  syncButtons();
 }
 $('playAll').addEventListener('click', togglePlay);
 // Space plays and pauses anywhere on the page, except while typing in the transcription box
@@ -2881,9 +2944,20 @@ function crepeFrame(buf, sr, st) {
 }
 // CREPE's answer is 360 scores, one per 20 cents from C1 up to B6; the note is the weighted centre of
 // the strongest score and its neighbours, and the strongest score is how sure the model is
-function crepeDecode(act) {
-  let c = 0;
-  for (let i = 1; i < 360; i++) if (act[i] > act[c]) c = i;
+// Only the range of singing voices is looked at (about 60 Hz to 1100 Hz): the model's stray answers far
+// below or above it are never a voice. near = the note being held (MIDI) or null: when the strongest score
+// is somewhere else (typically an octave or a fifth away, the model slipping onto an overtone for a moment)
+// but the held note is still at least half as strong, the held note is kept.
+function crepeDecode(act, near) {
+  const LO = 56, HI = 307;
+  let c = LO;
+  for (let i = LO + 1; i <= HI; i++) if (act[i] > act[c]) c = i;
+  if (near != null) {
+    const ni = Math.round((6551.3 + 100 * (near - 69) - 1997.3794084376191) / 20);
+    let b = -1;
+    for (let i = Math.max(LO, ni - 8); i <= Math.min(HI, ni + 8); i++) if (b < 0 || act[i] > act[b]) b = i;
+    if (b >= 0 && Math.abs(b - c) > 8 && act[b] >= 0.5 * act[c]) c = b;
+  }
   let ws = 0, cs = 0;
   for (let i = Math.max(0, c - 4); i <= Math.min(359, c + 4); i++) { ws += act[i]; cs += act[i] * (1997.3794084376191 + i * 7180 / 359); }
   return { hz: 10 * Math.pow(2, cs / ws / 1200), conf: act[c] };
@@ -2892,10 +2966,13 @@ async function crepeRun(x) {
   const out = tf.tidy(() => CREPE.model.predict(tf.tensor2d(x, [1, 1024])));
   const act = await out.data();
   out.dispose();
-  const r = crepeDecode(act), d = sing.det;
+  const r = crepeDecode(act, sing.stable), d = sing.det;
   // a note starts when the model is fairly sure, and keeps going while it stays somewhat sure
-  d.voiced = r.conf >= (d.voiced ? 0.35 : 0.5);
-  return d.voiced ? r.hz : null;
+  d.voiced = r.conf >= (d.voiced ? 0.4 : 0.55);
+  if (!d.voiced) { d.h = null; return null; }
+  // one reading that jumps away and straight back is a slip of the model: the middle one of the last three wins
+  d.h = (d.h || []).concat([r.hz]).slice(-3);
+  return d.h.length < 3 ? r.hz : d.h.slice().sort((a, b) => a - b)[1];
 }
 // reads the microphone and updates the steady pitch (sing.sungNow) and the moment it describes (sing.sungAt)
 function pumpPitch() {
@@ -2908,7 +2985,7 @@ function pumpPitch() {
     sing.busy = true;
     crepeRun(x).then(hz => feedPitch(hz, tc), () => feedPitch(null, tc)).finally(() => { sing.busy = false; });
   } else {
-    const n = Math.min(2048, sing.buf.length);
+    const n = Math.min(2048 * Math.max(1, Math.round(ctx.sampleRate / 48000)), sing.buf.length);
     feedPitch(detectPitch(sing.buf.subarray(sing.buf.length - n), ctx.sampleRate, sing.det), now - n / 2 / ctx.sampleRate);
   }
 }
@@ -2929,7 +3006,10 @@ async function ensureMic() {
   }
   if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
   try {
-    sing.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false } });
+    // With headphones the microphone must come through untouched: the browser's echo canceller treats a
+    // voice that sings the same notes as the music as an echo of it and thins or garbles it (and on Windows
+    // it makes the music duck while you sing). It is only switched on for singing over speakers.
+    sing.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: $('singSpk').checked, noiseSuppression: false, autoGainControl: false } });
   } catch (e) {
     msg.className = 'msg bad';
     msg.textContent = e && e.name === 'NotFoundError' ? 'No microphone was found. Plug one in and press Play again.'
@@ -2938,8 +3018,13 @@ async function ensureMic() {
   }
   const src = ctx.createMediaStreamSource(sing.stream);
   const an = ctx.createAnalyser();
-  an.fftSize = 4096;      // 85 ms: CREPE reads the newest 64 ms, the basic detector the newest 43 ms
-  src.connect(an);
+  // CREPE reads the newest 64 ms, the basic detector the newest 43 ms: 4096 samples hold that at 44.1 and
+  // 48 kHz; sound cards running at 96 or 192 kHz need more, or the pitch would be read a fifth or more low
+  let size = 4096;
+  while (size < 1024 * ctx.sampleRate / 16000 && size < 32768) size *= 2;
+  an.fftSize = size;
+  const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 55; hp.Q.value = 0.7;   // rumble and hum below any voice
+  src.connect(hp); hp.connect(an);
   if (ctx.state === 'suspended') ctx.resume();
   sing.an = an; sing.buf = new Float32Array(an.fftSize);
   try { const lt = sing.stream.getAudioTracks()[0].getSettings().latency; if (lt > 0 && lt < 0.5) sing.inLat = lt; } catch (e) { /* not reported */ }
@@ -2977,6 +3062,12 @@ function stablePitch(st, raw, t) {
   const k = Math.abs(gap), suspect = [12, 19, 24].some(j => Math.abs(k - j) < 0.6);
   if (st.candN >= 2 && t - st.candT >= (suspect ? 0.12 : 0.06)) st.stable = st.cand;
   return st.stable;
+}
+// the microphone is opened again with the other setting (headphones / speakers)
+function micReset() {
+  if (sing.stream) sing.stream.getTracks().forEach(t => t.stop());
+  sing.stream = null; sing.an = null; sing.buf = null; sing.det = {}; sing.sungNow = null;
+  if (sing.on) ensureMic().then(ok => { if (ok) startListening(); });
 }
 function singStep(pos) {
   if (!sing.an) return;
@@ -3098,11 +3189,11 @@ function singFinish() {
   box.hidden = false;
   if (!r) {
     $('rScore').textContent = '–'; $('rGrade').textContent = 'Nothing to score yet';
-    $('rStats').textContent = 'Press Play and sing along with your part, then finish.'; $('rBars').textContent = ''; $('rBest').textContent = '';
+    $('rStats').textContent = 'Press Play and sing along with your part, then finish.'; $('rBars').textContent = ''; $('rBest').textContent = ''; $('rBest').className = 'rbest';
+    singCelebrate(null, false);
     return;
   }
-  $('rScore').textContent = r.score;
-  $('rGrade').textContent = r.score >= 90 ? 'Excellent' : r.score >= 75 ? 'Good' : r.score >= 50 ? 'Getting there' : 'Keep practising';
+  $('rGrade').textContent = r.score >= 90 ? 'Excellent!' : r.score >= 75 ? 'Well sung!' : r.score >= 50 ? 'Getting there' : 'Keep practising';
   const t = Math.round(r.tendency), at = Math.abs(t), dir = t > 0 ? 'high' : 'low';
   const lean = at < 10 ? 'No clear tendency to sing sharp or flat.'
     : at < 70 ? 'You tend to sing a little ' + dir + ' (about ' + at + ' cents ' + (t > 0 ? 'sharp' : 'flat') + ').'
@@ -3123,11 +3214,82 @@ function singFinish() {
   const key = 'pp.best.' + piece.title + '.' + piece.voices[sing.part].name;
   const best = +(lsGet(key) || 0);
   if (r.score > best) lsSet(key, String(r.score));
-  $('rBest').textContent = r.score > best && best ? 'New best (was ' + best + ')' : 'Best: ' + Math.max(best, r.score);
+  const isBest = r.score > best && best > 0;
+  $('rBest').textContent = isBest ? 'New best! (was ' + best + ')' : 'Best: ' + Math.max(best, r.score);
+  $('rBest').className = 'rbest' + (isBest ? ' new' : '');
+  singCelebrate(r.sang < 0.05 ? 0 : r.score, isBest);
 }
+// The result pops up: the score counts up while its ring fills, stars drop in, and from 75 points (or a new
+// best) confetti flies and a short fanfare plays. score = null: nothing was sung, so no show at all.
+const celebrate = { raf: 0 };
+function singCelebrate(score, isBest) {
+  const box = $('singResult'), arc = $('rArc'), C = 326.73, calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  cancelAnimationFrame(celebrate.raf);
+  const cv = $('rConf'), g = cv.getContext('2d');
+  g.clearRect(0, 0, cv.width, cv.height);
+  box.classList.toggle('great', score != null && score >= 75);
+  box.classList.toggle('low', score == null || score < 50);
+  const stars = $('rStars'); stars.textContent = '';
+  if (score == null) { arc.style.strokeDashoffset = C; return; }
+  const nStar = score >= 90 ? 5 : score >= 75 ? 4 : score >= 60 ? 3 : score >= 40 ? 2 : score >= 20 ? 1 : 0;
+  for (let i = 0; i < 5; i++) {
+    const sp = document.createElement('span'); sp.textContent = '\u2605';
+    if (i < nStar) { sp.className = 'on'; sp.style.animationDelay = (0.5 + i * 0.14) + 's'; }
+    stars.appendChild(sp);
+  }
+  const party = score >= 75 || isBest;
+  if (party && ctx) {                               // fanfare: a rising chord, one more note for 90 and up
+    const t0 = ctx.currentTime + 0.25;
+    [523.25, 659.25, 783.99, 1046.5].concat(score >= 90 ? [1318.5] : []).forEach((f, i) => {
+      const o = ctx.createOscillator(), gn = ctx.createGain(), t = t0 + i * 0.11;
+      o.type = 'triangle'; o.frequency.value = f;
+      gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(0.11, t + 0.02); gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+      o.connect(gn); gn.connect(ctx.destination); o.start(t); o.stop(t + 0.75);
+    });
+  }
+  if (calm) { $('rScore').textContent = score; arc.style.strokeDashoffset = C * (1 - score / 100); return; }
+  // confetti: two bursts from the lower corners, falling and spinning
+  const dpr = window.devicePixelRatio || 1, W = window.innerWidth, H = window.innerHeight;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  const cols = ['--v1', '--v2', '--v3', '--v4', '--accent', '--good', '--warn'].map(cssVar), bits = [];
+  if (party) for (let i = 0, n = score >= 90 ? 200 : 130; i < n; i++) {
+    const left = i % 2 === 0, ang = (left ? -Math.PI / 3 : -2 * Math.PI / 3) + (Math.random() - 0.5) * 0.9, sp = (0.55 + Math.random() * 0.75) * Math.min(1100, Math.max(700, H * 1.1));
+    bits.push({ x: left ? W * 0.08 : W * 0.92, y: H * 0.96, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, w: 6 + Math.random() * 7, h: 4 + Math.random() * 5,
+      r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 12, c: cols[i % cols.length], d: Math.random() * 0.25 });
+  }
+  const start = performance.now();
+  let last = start;
+  const frame = now => {
+    const t = (now - start) / 1000, dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    const k = Math.min(1, t / 1.1), ease = 1 - Math.pow(1 - k, 3), shown = Math.round(score * ease);
+    $('rScore').textContent = shown; arc.style.strokeDashoffset = C * (1 - score * ease / 100);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    let alive = false;
+    bits.forEach(b => {
+      if (t < b.d) { alive = true; return; }
+      b.vy += 900 * dt; b.vx *= 1 - 0.9 * dt; b.vy *= 1 - 0.35 * dt;
+      b.x += b.vx * dt; b.y += b.vy * dt; b.r += b.vr * dt;
+      if (b.y > H + 30) return;
+      alive = true;
+      g.save(); g.translate(b.x, b.y); g.rotate(b.r); g.globalAlpha = Math.max(0, Math.min(1, 4.2 - t));
+      g.fillStyle = b.c; g.fillRect(-b.w / 2, -b.h / 2 * Math.cos(b.r * 1.7), b.w, b.h * Math.cos(b.r * 1.7)); g.restore();
+    });
+    if (box.hidden) { g.clearRect(0, 0, W, H); return; }
+    if (k < 1 || (alive && t < 4.5)) celebrate.raf = requestAnimationFrame(frame);
+    else g.clearRect(0, 0, W, H);
+  };
+  celebrate.raf = requestAnimationFrame(frame);
+}
+function singResultClose() { $('singResult').hidden = true; cancelAnimationFrame(celebrate.raf); }
+$('rClose').addEventListener('click', singResultClose);
+$('rClose2').addEventListener('click', singResultClose);
+$('singResult').addEventListener('click', e => { if (e.target === e.currentTarget) singResultClose(); });   // a click beside the card
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('singResult').hidden) singResultClose(); });
 
 function setSinging(on) {
   if (on && ed.on) setEditing(false);
+  if (!on && singCount.timer) singCountStop();
   sing.on = on;
   $('singOn').setAttribute('aria-pressed', String(on));
   $('singBody').hidden = !on;
@@ -3146,6 +3308,10 @@ $('singPart').addEventListener('change', e => {
 });
 $('singTol').addEventListener('change', () => { draw(); if (sing.done) singFinish(); });
 $('singOct').addEventListener('change', () => { newTake(); draw(); });
+$('singSpk').checked = lsGet('pp.singSpk') === '1';
+$('singSpk').addEventListener('change', e => { lsSet('pp.singSpk', e.target.checked ? '1' : '0'); micReset(); });
+$('singCount').checked = lsGet('pp.singCount') !== '0';
+$('singCount').addEventListener('change', e => lsSet('pp.singCount', e.target.checked ? '1' : '0'));
 $('singFinish').addEventListener('click', () => { if (session) pausePlay(); singFinish(); });
 $('rAgain').addEventListener('click', () => { newTake(); $('singResult').hidden = true; seekTo(0); togglePlay(); });
 
@@ -3537,7 +3703,7 @@ $('keyForget').addEventListener('click', () => {
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); no song is built into this file.
 var STUDIO = /[?&]studio\b/.test(location.search);
-const BUILD = '14 Nov 2026, 16:10';   // shown in the header, to see which version a browser has
+const BUILD = '15 Nov 2026, 13:30';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
 $('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
 if (STUDIO) document.title = 'Polyphony Studio';
