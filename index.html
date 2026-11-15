@@ -284,6 +284,8 @@ body.studio .user-only { display: none !important; }
         <select id="singTol"><option value="75">Easy (&plusmn;75&cent;)</option><option value="50" selected>Normal (&plusmn;50&cent;)</option><option value="30">Strict (&plusmn;30&cent;)</option></select></div>
       <label class="chk"><input type="checkbox" id="singOct" checked> Any octave</label>
       <label class="chk" title="Tick this only when the music comes from speakers: the microphone then filters the music out, which also makes your pitch less exact. Leave it off with headphones."><input type="checkbox" id="singSpk"> Speakers (no headphones)</label>
+      <div class="ctl" title="Which microphone hears you: the phone's or computer's own, or the one on your headset"><label for="singMic">Microphone</label><select id="singMic"><option value="">Default</option></select></div>
+      <div class="ctl" title="If your line comes out to the right of the notes (late), move this to the right until it lines up; to the left if it comes out early. Remembered on this device."><label for="singAdj">Line timing</label><input id="singAdj" type="range" min="-200" max="500" step="10" value="0"><output id="singAdjOut">0 ms</output></div>
       <label class="chk" title="Before playing, sound your part's next note and count in one bar, like Record in the studio"><input type="checkbox" id="singCount" checked> Starting note and count-in</label>
     </div>
     <div id="singBody" hidden>
@@ -1911,7 +1913,7 @@ function recLoop() {
   if (!session) { recFinish(); return; }
   pumpPitch();
   const age = sing.sungAt ? Math.max(0, Math.min(0.3, ctx.currentTime - sing.sungAt)) : 0.03;
-  const lat = (ctx.outputLatency || 0) + (ctx.baseLatency || 0) + sing.inLat + age;
+  const lat = singLatency() + age;
   const pos = (ctx.currentTime - session.t0) / session.bd - lat / session.bd;
   if (pos >= 0) {
     const t = edPlain(locate(pos).within);
@@ -3095,7 +3097,16 @@ async function ensureMic() {
     // With headphones the microphone must come through untouched: the browser's echo canceller treats a
     // voice that sings the same notes as the music as an echo of it and thins or garbles it (and on Windows
     // it makes the music duck while you sing). It is only switched on for singing over speakers.
-    sing.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: $('singSpk').checked, noiseSuppression: false, autoGainControl: false } });
+    const want = lsGet('pp.singMic') || '';
+    const audio = { echoCancellation: $('singSpk').checked, noiseSuppression: false, autoGainControl: false };
+    try {
+      sing.stream = await navigator.mediaDevices.getUserMedia({ audio: want ? Object.assign({ deviceId: { exact: want } }, audio) : audio });
+    } catch (e) {
+      if (!want || e.name === 'NotAllowedError') throw e;
+      lsSet('pp.singMic', '');                       // the chosen microphone is gone (unplugged): use the default one
+      sing.stream = await navigator.mediaDevices.getUserMedia({ audio });
+    }
+    micList();
   } catch (e) {
     msg.className = 'msg bad';
     msg.textContent = e && e.name === 'NotFoundError' ? 'No microphone was found. Plug one in and press Play again.'
@@ -3149,19 +3160,49 @@ function stablePitch(st, raw, t) {
   if (st.candN >= 2 && t - st.candT >= (suspect ? 0.12 : 0.06)) st.stable = st.cand;
   return st.stable;
 }
-// the microphone is opened again with the other setting (headphones / speakers)
+// The microphones this device has, in the Microphone menu. Their names are only known once the page may use
+// the microphone, so the list is filled again after that, and whenever one is plugged in or out.
+async function micList() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  let devs = [];
+  try { devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications'); } catch (e) { return; }
+  const sel = $('singMic'), want = lsGet('pp.singMic') || '';
+  const using = sing.stream && sing.stream.getAudioTracks()[0] ? sing.stream.getAudioTracks()[0].getSettings().deviceId : '';
+  sel.textContent = '';
+  const def = document.createElement('option'); def.value = ''; def.textContent = 'Default'; sel.appendChild(def);
+  devs.forEach((d, i) => {
+    const o = document.createElement('option'); o.value = d.deviceId;
+    o.textContent = (d.label || 'Microphone ' + (i + 1)).replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '');
+    sel.appendChild(o);
+  });
+  sel.value = devs.some(d => d.deviceId === want) ? want : '';
+  sel.title = using && !want ? 'Now using: ' + ((devs.find(d => d.deviceId === using) || {}).label || 'the default microphone') : '';
+}
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => micList());
+// the microphone is opened again with the other setting (headphones / speakers, or another microphone)
 function micReset() {
   if (sing.stream) sing.stream.getTracks().forEach(t => t.stop());
   sing.stream = null; sing.an = null; sing.buf = null; sing.det = {}; sing.sungNow = null;
   if (sing.on) ensureMic().then(ok => { if (ok) startListening(); });
 }
+// How long a sound takes from the speakers or headphones to the singer and back through the microphone into
+// the page, in seconds. Browsers that report their output delay (most desktop ones) are trusted; phones often
+// report nothing or too little, and Bluetooth headphones add 0.15-0.3 s more, so there a typical phone value
+// is assumed. The "Line timing" slider adds or removes time on top, for the delay this can't know.
+function singLatency() {
+  const out = (ctx.outputLatency || 0) + (ctx.baseLatency || 0);
+  const phone = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  const guess = phone ? Math.max(out, 0.09) : out;
+  return Math.max(0, guess + sing.inLat + singAdj() / 1000);
+}
+function singAdj() { return +$('singAdj').value || 0; }
 function singStep(pos) {
   if (!sing.an) return;
   pumpPitch();
   // compare with the note that was sounding when this sound left the singer: the music reached the
   // speakers late, the microphone adds its own delay, and the pitch read describes a moment slightly back
   const age = sing.sungAt ? Math.max(0, Math.min(0.3, ctx.currentTime - sing.sungAt)) : 0.03;
-  const lat = (ctx.outputLatency || 0) + (ctx.baseLatency || 0) + sing.inLat + age;
+  const lat = singLatency() + age;
   const b = pos - lat / session.bd;
   if (b < 0) return;
   const L = locate(b), w = L.within;
@@ -3394,6 +3435,13 @@ $('singPart').addEventListener('change', e => {
 });
 $('singTol').addEventListener('change', () => { draw(); if (sing.done) singFinish(); });
 $('singOct').addEventListener('change', () => { newTake(); draw(); });
+micList();
+$('singMic').addEventListener('change', e => { lsSet('pp.singMic', e.target.value); micReset(); });
+$('singAdj').value = lsGet('pp.singAdj') || 0;
+const singAdjShow = () => { const v = singAdj(); $('singAdjOut').textContent = (v > 0 ? '+' : '') + v + ' ms'; };
+singAdjShow();
+$('singAdj').addEventListener('input', () => { singAdjShow(); lsSet('pp.singAdj', String(singAdj())); });
+$('singAdj').addEventListener('dblclick', () => { $('singAdj').value = 0; singAdjShow(); lsSet('pp.singAdj', '0'); });
 $('singSpk').checked = lsGet('pp.singSpk') === '1';
 $('singSpk').addEventListener('change', e => { lsSet('pp.singSpk', e.target.checked ? '1' : '0'); micReset(); });
 $('singCount').checked = lsGet('pp.singCount') !== '0';
@@ -3789,7 +3837,7 @@ $('keyForget').addEventListener('click', () => {
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); no song is built into this file.
 var STUDIO = /[?&]studio\b/.test(location.search);
-const BUILD = '15 Nov 2026, 19:10';   // shown in the header, to see which version a browser has
+const BUILD = '15 Nov 2026, 20:00';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
 $('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
 if (STUDIO) document.title = 'Polyphony Studio';
