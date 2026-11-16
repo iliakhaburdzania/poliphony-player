@@ -143,6 +143,9 @@ body.studio .user-only { display: none !important; }
 #recBtn.rec { background: var(--bad); border-color: var(--bad); color: #fff; }
 .baredit { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding: 12px; border: 1px solid var(--accent); border-radius: 8px; background: var(--bg); }
 #lyText { font: inherit; font-family: var(--font-mono); font-size: 14px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 100%; }
+#nsTitle, #songTitle { font: inherit; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; flex: 1 1 200px; min-width: 0; }
+#nsBars, #nsTempo { font: inherit; width: 5.5em; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+.newsong { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 #projName { font: inherit; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; flex: 1 1 200px; min-width: 0; }
 #projList { max-width: min(320px, 60vw); }
 .singhead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
@@ -250,8 +253,25 @@ body.studio .user-only { display: none !important; }
     <p class="msg" id="libMsg"></p>
   </section>
 
-  <section class="panel upload studio-only" aria-label="Upload a score">
-    <h2>Play your own score</h2>
+  <section class="panel upload studio-only" aria-label="New song">
+    <h2>New song</h2>
+    <div class="newsong">
+      <p class="note">Start an empty song and draw the notes in, or sing them in with Record, in editing mode.</p>
+      <div class="actions">
+        <input id="nsTitle" type="text" placeholder="Song title" autocomplete="off" aria-label="Song title">
+        <div class="ctl"><label for="nsVoices">Voices</label><select id="nsVoices">
+          <option value="Tenor I|Tenor II|Bass" selected>Tenor I, Tenor II, Bass</option>
+          <option value="Tenor I|Tenor II|Bass I|Bass II">Tenor I, Tenor II, Bass I, Bass II</option>
+          <option value="Tenor|Bass">Tenor, Bass</option>
+          <option value="Voice">One voice</option>
+        </select></div>
+        <div class="ctl"><label for="nsBeats">Beats per bar</label><select id="nsBeats"><option>2</option><option>3</option><option selected>4</option><option>6</option></select></div>
+        <div class="ctl"><label for="nsBars">Bars</label><input id="nsBars" type="number" min="1" max="200" value="16"></div>
+        <div class="ctl"><label for="nsTempo">Tempo</label><input id="nsTempo" type="number" min="40" max="160" value="72"></div>
+        <button class="primary" id="nsCreate" type="button">Create empty song</button>
+      </div>
+    </div>
+    <h2>Or read it from sheet music</h2>
     <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose score pictures or MusicXML">
       <button class="small" id="pick" type="button">Choose file</button>
       <span><strong>or drop it here.</strong> A picture of the notes, or a MusicXML file from notation software. Several files are read as consecutive pages.</span>
@@ -327,6 +347,7 @@ body.studio .user-only { display: none !important; }
   <section class="panel editp studio-only" aria-label="Editing mode and projects">
     <div class="singhead">
       <button class="small toggle" id="editOn" type="button" aria-pressed="false" style="--c: var(--accent)">Editing mode</button>
+      <input id="songTitle" type="text" autocomplete="off" aria-label="Song title" title="The song's title; change it here, then Save">
       <button class="primary" id="songSave" type="button" title="Save this song into songs.json in the app folder (Ctrl+S)">Save</button>
       <button class="small" id="pianoPdf" type="button" title="Download the song as sheet music, as a PDF ready to print: each tenor on its own line, the basses together (needs the internet the first time)">Export PDF</button>
       <button class="small" id="pianoExport" type="button" title="Download the piano sheet music as a MusicXML file: open it in MuseScore or other notation software to change the notes">Export MusicXML</button>
@@ -454,20 +475,6 @@ body.studio .user-only { display: none !important; }
     </div>
   </section>
 
-  <details class="panel studio-only" id="editor">
-    <summary>Transcription (check and correct)</summary>
-    <div class="inner">
-      <p class="note">Each bar is a line of NOTE:BEATS tokens. Pitches are written as on the staff (F#4, Bb3, E5), r is a rest, beats count quarter notes (0.5 is an eighth). A ~ after the length ties the note into the next bar. Change a note, press Apply, and play again, or use Editing mode above the score.</p>
-      <textarea id="json" spellcheck="false" aria-label="Transcription JSON"></textarea>
-      <div class="actions">
-        <button class="small" id="apply" type="button">Apply changes</button>
-        <p class="msg" id="applyMsg"></p>
-      </div>
-    </div>
-  </details>
-
-  <p class="note">Singing mode needs your microphone. If the browser doesn't ask for it when you open this file directly, open a terminal in the file's folder, run <code>python3 -m http.server</code>, and open <code>http://localhost:8000/</code>.</p>
-  <p class="note" id="foot">The example was transcribed from the score image. A picture you upload is read by Claude and can contain mistakes, so listen once with the notation next to you and fix any wrong note above.</p>
 </main>
 <div class="minibar" id="miniBar" hidden aria-label="Playback">
   <button class="primary" id="miniPlay" type="button">Play</button>
@@ -537,7 +544,7 @@ const lenOf = bar => bar.length ? bar[bar.length - 1].off + bar[bar.length - 1].
 function barList(nums) { const a = nums.slice(0, 8).join(', '); return nums.length > 8 ? a + '…' : a; }
 
 function normalizePiece(raw) {
-  if (raw && raw.kind === 'audio') return normalizeAudio(raw);
+  if (raw && raw.kind === 'audio') throw new Error('Recordings can’t be loaded: write the song in with notes, singing or drawing instead.');
   const warns = [], info = [];
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.voices) || !raw.voices.length) throw new Error('The answer holds no parts to play.');
   if (raw.voices.length > 6) warns.push('Only the first 6 staves are used.');
@@ -594,22 +601,6 @@ function normalizePiece(raw) {
     },
     warns, info,
     uncertain: Array.isArray(raw.uncertain) ? raw.uncertain.map(String).filter(Boolean).slice(0, 12) : []
-  };
-}
-
-function normalizeAudio(raw) {
-  const voices = (Array.isArray(raw.voices) ? raw.voices : []).slice(0, 4).map((v, i) => ({
-    name: String((v && v.name) || 'Voice ' + (i + 1)).slice(0, 30),
-    notes: (Array.isArray(v && v.notes) ? v.notes : []).filter(n => Array.isArray(n) && n[0] >= 21 && n[0] <= 108 && n[2] > 0).map(n => [Math.round(n[0]), +n[1], +n[2]])
-  }));
-  if (!voices.length || !voices.some(v => v.notes.length)) throw new Error('No clear notes were found in the recording.');
-  const end = Math.max(...voices.map(v => (v.notes.length ? v.notes[v.notes.length - 1][1] + v.notes[v.notes.length - 1][2] : 0)));
-  return {
-    piece: {
-      audio: true, title: String(raw.title || 'Recording').slice(0, 120), subtitle: String(raw.subtitle || '').slice(0, 200),
-      tempo: 60, reps: 1, voices, breath: new Set(), fermata: new Set(), lyrics: [], length: Math.max(1, Number(raw.length) || end)
-    },
-    warns: [], info: Array.isArray(raw.info) ? raw.info.map(String) : [], uncertain: []
   };
 }
 
@@ -713,15 +704,12 @@ function showIssues(r, extra) {
 }
 
 function loadRaw(raw, from) {
-  const isAudio = !!(raw && raw.kind === 'audio');
   const r = buildPiece(raw);
-  curRaw = isAudio ? null : raw;
+  curRaw = raw;
   if (typeof showLibrary === 'function' && $('songList').childElementCount) showLibrary();
-  if (ed.on) { if (isAudio) setEditing(false); else { edFromPiece(); ed.undo = []; ed.redo = []; edRanges(); edShowState(); draw(); } }
-  $('editor').hidden = isAudio;
-  $('json').value = isAudio ? '' : JSON.stringify(raw, null, 1);
+  if (ed.on) { edFromPiece(); ed.undo = []; ed.redo = []; edRanges(); edShowState(); draw(); }
+  $('songTitle').value = raw.title || '';
   showIssues(r);
-  if (isAudio) return from + ': ' + piece.voices.length + ' voices, ' + events.length + ' notes, ' + mmss(PASS) + '.';
   const bars = piece.voices[0].bars.length;
   const fm = piece.fermata.size ? ', fermata in bar ' + barList([...piece.fermata]) : '';
   return from + ': ' + piece.voices.length + ' parts, ' + bars + ' bars' + fm + '.';
@@ -1457,7 +1445,6 @@ function edRefresh() {
   const keepOn = state.on.slice(), vols = volEls.map(x => x.value), c = cursor, sl = wrap.scrollLeft, playing = !!session, pos = playing ? currentBeat() : 0;
   buildPiece(raw);
   curRaw = raw;
-  $('json').value = JSON.stringify(raw, null, 1);
   if (keepOn.length === state.on.length) { state.on = keepOn; volEls.forEach((x, i) => { x.value = vols[i]; }); syncButtons(); }
   edPrefix(); edRanges();
   showPos(Math.min(c, totalBeats()));
@@ -1691,39 +1678,40 @@ function edCopy() {
   const sel = edSelected(), words = lySelected();
   if (!sel.length) { const ok = words.length ? lyCopy() : false; if (ok) $('edPaste').disabled = false; return ok; }
   const t0 = Math.min(...sel.map(s => s.n.t), ...words.map(x => x.w.t));
-  ed.clip = sel.map(s => ({ v: s.v, midi: s.n.midi, t: s.n.t - t0, d: s.n.d }));
+  ed.clip = sel.map(s => ({ v: s.v, midi: s.n.midi, snd: s.n.midi + s.p.shift, t: s.n.t - t0, d: s.n.d }));
   ed.clipWords = words.map(x => ({ v: x.v, t: x.w.t - t0, d: x.w.d, text: x.w.text }));
+  ed.clipT0 = t0;
   ed.lastCopy = 'notes';
-  if (words.length) {                               // the words can also go into another part on their own (see edPaste)
-    const v0 = words[0].v, mine = words.filter(x => x.v === v0), w0 = Math.min(...mine.map(x => x.w.t));
-    ly.clip = mine.map(x => ({ t: x.w.t - w0, d: x.w.d, text: x.w.text }));
-    ly.clipT0 = w0; ly.clipV = v0; ly.target = null; ly.pasteAt = null;
-  }
+  ly.target = null; ly.pasteAt = null;             // a click from now on says where the paste goes
   edShowState();
-  if (words.length) $('edInfo').textContent = 'Copied ' + sel.length + (sel.length === 1 ? ' note and ' : ' notes and ') + words.length + (words.length === 1 ? ' word' : ' words') + '. Ctrl+V puts them at the playhead; to put only the words into another part, click that part first, then Ctrl+V.';
+  const what = sel.length + (sel.length === 1 ? ' note' : ' notes') + (words.length ? ' and ' + words.length + (words.length === 1 ? ' word' : ' words') : '');
+  $('edInfo').textContent = 'Copied ' + what + '. Click where they should go (in any part) and press Ctrl+V.';
   return true;
 }
 function edCut() { if (!edCopy()) return; if (lySelected().length) lyDeleteSel(true); else edDelete(); }
 function edPaste() {
   if (ed.lastCopy === 'words') { lyPaste(); return; }
   if (!ed.clip || !ed.clip.length) return;
-  const at = edSnap(edPlain(locate(session ? currentBeat() : cursor).within));
-  const W = ed.clipWords || [], pasted = [];
-  // words copied along with notes, and since then a part they don't come from was clicked: only the words go
-  // there (Tenor II's words into Tenor I), the notes stay out of it
-  if (W.length && ly.target != null && !ed.clip.some(c => c.v === ly.target) && !W.some(c => c.v === ly.target)) { lyPaste(); return; }
+  // Like words: after a click, the notes go into the part clicked (the highest copied part lands there, the
+  // others keep their distance below it), starting at the moment clicked; without a click since the copy,
+  // they go back into their own parts at the playhead. They keep their sounding pitch, so a tenor's notes
+  // pasted into a bass part sound where they sounded (Shift+down moves them an octave).
+  const W = ed.clipWords || [], pasted = [], clicked = ly.target != null;
+  const at = clicked && ly.pasteAt != null ? ly.pasteAt : edSnap(edPlain(locate(session ? currentBeat() : cursor).within));
+  const v0 = Math.min(...ed.clip.map(c => c.v), ...W.map(c => c.v)), dv = clicked ? ly.target - v0 : 0;
   const body = list => {
     const added = [];
     ed.clip.forEach(c => {
-      const p = ed.model.parts[c.v];
+      const p = ed.model.parts[c.v + dv];
       if (!p || at + c.t >= edTotal() - 1e-3) return;
-      const n = { id: ed.nextId++, midi: c.midi, t: at + c.t, d: Math.min(c.d, edTotal() - at - c.t) };
+      const midi = c.snd != null ? c.snd - p.shift : c.midi;
+      const n = { id: ed.nextId++, midi, t: at + c.t, d: Math.min(c.d, edTotal() - at - c.t) };
       p.notes.push(n); added.push(n);
     });
     ed.model.parts.forEach(p => edCarve(p, p.notes.filter(n => added.includes(n))));
     ed.sel = new Set(added.map(n => n.id));
     const byV = {}, total = edTotal();               // the copied words: those already in the way are replaced
-    W.forEach(c => { const t = at + c.t, dur = Math.min(c.d, total - t); if (ed.model.parts[c.v] && dur > 0.05) (byV[c.v] = byV[c.v] || []).push({ t, d: dur, text: c.text }); });
+    W.forEach(c => { const t = at + c.t, dur = Math.min(c.d, total - t), v = c.v + dv; if (ed.model.parts[v] && dur > 0.05) (byV[v] = byV[v] || []).push({ t, d: dur, text: c.text }); });
     Object.keys(byV).forEach(v => {
       const L = list(+v), add = byV[v];
       for (let k = L.length - 1; k >= 0; k--) if (add.some(w => L[k].t < w.t + w.d - 1e-3 && L[k].t + L[k].d > w.t + 1e-3)) L.splice(k, 1);
@@ -2282,7 +2270,6 @@ function rebuildKeeping(raw) {
   const keepOn = state.on.slice(), vols = volEls.map(x => x.value), c = cursor, sl = wrap.scrollLeft, playing = !!session, pos = playing ? currentBeat() : 0;
   const r = buildPiece(raw);
   curRaw = raw;
-  $('json').value = JSON.stringify(raw, null, 1);
   if (keepOn.length === state.on.length) { state.on = keepOn; volEls.forEach((x, i) => { x.value = vols[i]; }); syncButtons(); }
   showPos(Math.min(c, totalBeats())); wrap.scrollLeft = sl;
   if (playing) startPlay(Math.min(pos, totalBeats()));
@@ -2826,49 +2813,8 @@ function drawLyrics(g, G, X) {
   g.globalAlpha = 1; g.font = '11px ' + cssVar('--font-mono');
 }
 
-/* ---------- transcription links (studio) ---------- */
-// Clicking a bar in the Transcription box highlights that bar (hiBar = { src: voice, bi: bar }) in the score.
+// a bar picked to be highlighted in the score (hiBar = { src: voice, bi: bar }); nothing sets it at the moment
 let hiBar = null;
-// the caret in the transcription text shows its bar in the score
-function jsonCaretBar() {
-  const ta = $('json'), pos = ta.selectionStart, t = ta.value;
-  const at = t.lastIndexOf('"bars"', pos);
-  if (at < 0) return null;
-  const open = t.indexOf('[', at), close = t.indexOf(']', open);
-  if (open < 0 || pos <= open || (close >= 0 && pos > close)) return null;
-  let vi = 0, k = -1;
-  while ((k = t.indexOf('"bars"', k + 1)) >= 0 && k < at) vi++;
-  const quotes = (t.slice(open, pos).match(/"/g) || []).length;
-  return { vi, bi: Math.floor(quotes / 2) };
-}
-function jsonShowBar() {
-  if (!piece || piece.audio) return;
-  const h = jsonCaretBar();
-  if (!h || h.bi >= barStart.length) { if (hiBar) { hiBar = null; draw(); } return; }
-  hiBar = { src: h.vi, bi: h.bi };
-  if (!session) {
-    const c = locate(cursor).p * (PASS + GAP) + barStart[h.bi];
-    showPos(c);
-    const G = geo(), x = G.X(barStart[h.bi]);
-    if (x < wrap.scrollLeft + 20 || x > wrap.scrollLeft + wrap.clientWidth - 60) wrap.scrollLeft = Math.max(0, x - wrap.clientWidth * 0.25);
-  }
-  draw();
-}
-$('json').addEventListener('click', jsonShowBar);
-$('json').addEventListener('keyup', e => { if (/^(Arrow|Home|End|Page)/.test(e.key)) jsonShowBar(); });
-
-/* ---------- transcription editor ---------- */
-$('apply').addEventListener('click', () => {
-  const msg = $('applyMsg'); msg.className = 'msg';
-  try {
-    const raw = JSON.parse($('json').value);
-    msg.textContent = loadRaw(raw, 'Applied');
-    ed.dirty = true; projShowState();
-  } catch (e) {
-    msg.className = 'msg bad';
-    msg.textContent = 'Could not apply: ' + (e && e.message ? e.message : 'the text is not valid JSON.');
-  }
-});
 
 /* ---------- singing mode ---------- */
 // Listens to the microphone while the score plays, follows the singer's pitch (McLeod pitch method),
@@ -3748,7 +3694,7 @@ async function apiJSON(prompt, files, signal) {
 
 function setReading(on) {
   $('read').disabled = on || !picked.length || !canRead(); $('stopRead').hidden = !on;
-  $('pick').disabled = on; $('apply').disabled = on;
+  $('pick').disabled = on;
 }
 $('read').addEventListener('click', async () => {
   if (!canRead() || !picked.length) return;
@@ -3778,9 +3724,8 @@ $('read').addEventListener('click', async () => {
       })
       : await apiJSON(PROMPT, imgs, ctl.signal);
     }
-    msg.textContent = loadRaw(raw, from) + (from === 'Loaded from MusicXML' ? '' : ' Listen with the score beside you and correct any note below.');
+    msg.textContent = loadRaw(raw, from) + (from === 'Loaded from MusicXML' ? '' : ' Listen with the score beside you and correct any wrong note in editing mode.');
     ed.project = null; ed.dirty = true; $('projName').value = ''; songKeyLoaded = null;
-    $('editor').open = false;
   } catch (e) {
     msg.className = 'msg bad';
     if (e && (e.code === 'cancelled' || e.name === 'AbortError')) { msg.className = 'msg'; msg.textContent = 'Stopped.'; }
@@ -3837,7 +3782,7 @@ $('keyForget').addEventListener('click', () => {
 // index.html?studio) is the full app: reading scores, the transcription, editing mode and projects.
 // The library is songs.json next to this page ({ songs: [score, …] }); no song is built into this file.
 var STUDIO = /[?&]studio\b/.test(location.search);
-const BUILD = '15 Nov 2026, 20:00';   // shown in the header, to see which version a browser has
+const BUILD = '17 Nov 2026, 01:10';   // shown in the header, to see which version a browser has
 document.body.classList.toggle('studio', STUDIO);
 $('appName').textContent = (STUDIO ? 'Polyphony studio' : 'Polyphony player') + ' \u00B7 build ' + BUILD;
 if (STUDIO) document.title = 'Polyphony Studio';
@@ -3940,6 +3885,38 @@ async function libAdd() {
   projMsg((i >= 0 ? 'Updated “' : 'Added “') + raw.title + '” (' + songs.length + ' songs). Replace songs.json in the app folder with the downloaded file, then commit and push.');
 }
 $('libAdd').addEventListener('click', libAdd);
+
+/* ---------- new song ---------- */
+// An empty song: the chosen voices (tenors written an octave up, as usual in choir scores), bars of rests,
+// and editing mode switched on to draw or sing the notes in. Save adds it to songs.json.
+$('nsCreate').addEventListener('click', () => {
+  const title = $('nsTitle').value.trim();
+  if (!title) { $('readMsg').className = 'msg bad'; $('readMsg').textContent = 'Give the new song a title first.'; $('nsTitle').focus(); return; }
+  if (ed.dirty && !confirm('Start “' + title + '”? Unsaved changes to the current song will be lost.')) return;
+  const beats = +$('nsBeats').value || 4, nb = Math.max(1, Math.min(200, Math.round(+$('nsBars').value) || 16));
+  const tempo = Math.max(40, Math.min(160, Math.round(+$('nsTempo').value) || 72));
+  const raw = { title, subtitle: '', tempo, repeatTimes: 1,
+    voices: $('nsVoices').value.split('|').map(name => ({ name, octaveShift: /tenor/i.test(name) ? -12 : 0, bars: Array(nb).fill('r:' + beats) })),
+    breathAfter: [], fermataBars: [] };
+  if (session) pausePlay();
+  $('readMsg').className = 'msg';
+  $('readMsg').textContent = loadRaw(raw, 'New song');
+  showPos(0);
+  songKeyLoaded = null; ed.project = null; ed.dirty = true;
+  setEditing(true);
+  edSetTool('draw');
+  $('nsTitle').value = '';
+  projMsg('“' + title + '” is new and not saved yet. Draw the notes in (Draw tool), or choose a part and sing it in with Record and “New notes”. Save adds it to the songs.');
+  $('editOn').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+// renaming the open song: Save then replaces it under its new title (songKeyLoaded still points at it)
+$('songTitle').addEventListener('change', e => {
+  const t = e.target.value.trim();
+  if (!t || !curRaw) { e.target.value = curRaw ? curRaw.title : ''; return; }
+  if (ed.on && ed.model) edChange(() => { ed.model.meta.title = t; });
+  else { rebuildKeeping(Object.assign({}, curRaw, { title: t })); ed.dirty = true; }
+  projMsg('Renamed to “' + t + '”. Press Save to keep it.');
+});
 
 /* ---------- export: sheet music for piano (MusicXML) ---------- */
 // Writes the song as a score at sounding pitch: every voice on its own staff, except the basses, which share
@@ -4226,7 +4203,13 @@ async function songSave() {
   try {
     const songs = await readSongs(h);
     let i = songKeyLoaded ? songs.findIndex(x => songKey(x) === songKeyLoaded) : -1;
-    if (i < 0) i = songs.findIndex(x => songKey(x) === songKey(raw));
+    if (i < 0) {
+      i = songs.findIndex(x => songKey(x) === songKey(raw));
+      // a new song with the title of one already in the list: only replace that one when asked to
+      if (i >= 0 && !confirm('A song called “' + songs[i].title + '” is already in the list. Replace it with this one?')) {
+        projMsg('Not saved. Give this song another title (next to Save), then Save again.', true); return;
+      }
+    }
     if (i >= 0) songs[i] = raw; else songs.push(raw);
     const w = await h.createWritable();
     await w.write(JSON.stringify({ songs }, null, 1) + '\n');
